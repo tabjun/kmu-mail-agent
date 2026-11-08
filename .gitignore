@@ -9,3 +9,6 @@ secrets/
 __pycache__/
 *.pyc
 .pytest_cache/
+
+# API key package for direct hand-off (never commit)
+kmu-mail-agent-key*
