@@ -214,3 +214,37 @@ def test_events_go_to_the_calendar_of_the_mailbox_they_came_from():
     assert gmail_cal.got == ["gmail meeting"]
     assert outlook_cal.got == ["outlook meeting"]
     assert main.got == ["other mailbox", "✅ 오늘 할 일"]
+
+
+def test_cleanup_rules_are_learned_from_approvals_with_guardrails(tmp_path):
+    from datetime import datetime
+
+    from mail_agent.config import Settings
+    from mail_agent.learn import LearnedRules, RuleSuggestion, learn_from_cleanup
+    from mail_agent.preferences import PreferencesStore
+
+    approved = [{"subject": "[사람인] 오늘의 추천 공고", "sender": "saramin", "reason": "뉴스레터"},
+                {"subject": "[잡코리아] 맞춤 채용 정보", "sender": "jobkorea", "reason": "뉴스레터"},
+                {"subject": "[넵튠] 지원서 접수 완료", "sender": "neptune", "reason": "자동 발송"}]
+    kept = [{"subject": "[연구재단] 과제 협약 안내", "sender": "nrf", "reason": "공지"}]
+
+    class FakeLLM:
+        def _parse(self, **kw):
+            assert "연구재단" in kw["user"] and "사람인" in kw["user"]   # both lists are shown to the model
+            return LearnedRules(rules=[
+                RuleSuggestion(text="채용 플랫폼(사람인·잡코리아)이 자동 발송하는 공고 추천 메일", kind="cleanup",
+                               examples=["[사람인] 오늘의 추천 공고", "[잡코리아] 맞춤 채용 정보"]),
+                RuleSuggestion(text="지어낸 예시만 있는 규칙", kind="cleanup", examples=["없는 메일", "또 없는 메일"]),
+                RuleSuggestion(text="제목에 (광고)/[광고]가 있는 마케팅 메일", kind="cleanup",   # duplicate of a default
+                               examples=["[사람인] 오늘의 추천 공고", "[잡코리아] 맞춤 채용 정보"]),
+                RuleSuggestion(text="연구재단 메일은 남긴다", kind="keep", examples=["[연구재단] 과제 협약 안내"]),
+            ])
+
+    s = Settings(data_dir=tmp_path)
+    store = PreferencesStore(tmp_path / "preferences.json")
+    new = learn_from_cleanup(s, store, approved, kept, llm=FakeLLM(), now=datetime(2026, 11, 8, 19, 0))
+    assert [r.text for r in new] == ["채용 플랫폼(사람인·잡코리아)이 자동 발송하는 공고 추천 메일", "연구재단 메일은 남긴다"]
+    saved = store.load()
+    assert [r.kind for r in saved.cleanup.learned] == ["cleanup", "keep"]
+    rules = saved.to_prompt_rules()
+    assert "채용 플랫폼" in rules and "연구재단 메일은 남긴다" in rules

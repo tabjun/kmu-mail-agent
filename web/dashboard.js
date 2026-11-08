@@ -141,13 +141,14 @@ async function refreshPrefs() {
       <dt>오늘 할 일 알림</dt><dd>${p.calendar.checklist_time ? `매일 ${esc(p.calendar.checklist_time)}` : "끔"}</dd>
       <dt>회의 · 마감 알림</dt><dd>${(p.calendar.meeting_reminders.length ? p.calendar.meeting_reminders : [p.calendar.meeting_reminder_minutes]).map(offsetText).join(", ")} · ${(p.calendar.deadline_reminders.length ? p.calendar.deadline_reminders : [p.calendar.deadline_reminder_minutes]).map(offsetText).join(", ")}</dd>
       <dt>점검 알림</dt><dd>${p.calendar.precheck_days.length ? p.calendar.precheck_days.map((d) => `D-${d}`).join(", ") + ` ${esc(p.calendar.precheck_time)}` : "끔"}</dd>
-      <dt>불필요한 메일</dt><dd>${esc(mode)} · 기준 ${p.cleanup.rules.length}개 · 예외 ${p.cleanup.keep_rules.length}개</dd>
+      <dt>불필요한 메일</dt><dd>${esc(mode)} · 기준 ${p.cleanup.rules.length}개 · 예외 ${p.cleanup.keep_rules.length}개 · <a href="#" onclick="openLearnedRules();return false">자동으로 배운 규칙 ${(p.cleanup.learned || []).length}개</a></dd>
       <dt>우선순위 규칙</dt><dd>${p.priority_rules.length}개 · 중요 발신자 ${p.vip_senders.length}명</dd>
       <dt>메일 확인</dt><dd>${p.monitor.enabled ? `${p.monitor.interval_minutes}분마다` : "끔"}</dd>
       <dt>분류 모델</dt><dd>${esc(p.triage_model.replace("claude-", ""))}</dd></dl>
       <details><summary>규칙 전체 보기</summary><dl class="kv">
         <dt>불필요한 메일 기준</dt><dd>${listHtml(p.cleanup.rules)}</dd>
         <dt>지우지 않는 예외</dt><dd>${listHtml(p.cleanup.keep_rules)}</dd>
+        <dt>자동으로 배운 규칙</dt><dd>${listHtml((p.cleanup.learned || []).map((r) => (r.kind === "keep" ? "[남기기] " : "") + r.text))}</dd>
         <dt>우선순위 규칙</dt><dd>${listHtml(p.priority_rules)}</dd>
         <dt>중요 발신자</dt><dd>${listHtml(p.vip_senders)}</dd></dl></details>`;
   } catch (e) { $("prefs-body").innerHTML = `<p class="muted">불러오기 실패: ${esc(e.message)}</p>`; }
@@ -208,3 +209,11 @@ $("env-copy").addEventListener("click", async () => {
 });
 $("env-recheck").addEventListener("click", () => refreshEnv(true));
 refreshEnv();
+
+// ---------- learned cleanup rules ----------
+async function refreshLearnedCount() {
+  try { $("learned-count").textContent = (await api("/api/cleanup/learned")).rules.length; } catch { /* ignore */ }
+}
+$("open-learned").addEventListener("click", () => openLearnedRules());
+window.addEventListener("learned-rules-changed", () => { refreshLearnedCount(); refreshPrefs(); refreshActions(); });
+refreshLearnedCount();

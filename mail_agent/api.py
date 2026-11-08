@@ -290,6 +290,7 @@ def create_app(settings: Settings | None = None, store: Store | None = None, llm
     assistant = Assistant(fresh_settings, store, monitor)
     prefs_store = PreferencesStore(s.prefs_path)
     device_logins: dict[str, dict] = {}
+    learn_state: dict[int, dict] = {}
 
     ENV_ATTRS = ("anthropic_api_key", "anthropic_workspace_id", "ms_client_id", "ms_tenant",
                  "google_client_id", "google_client_secret")
@@ -434,9 +435,48 @@ def create_app(settings: Settings | None = None, store: Store | None = None, llm
         rt = graph_runtime(st, store)
         try:
             only = set(req.message_ids) if req and req.message_ids is not None else None
-            return execute_action(action, store, rt.mail_actions, only_ids=only)
+            result = execute_action(action, store, rt.mail_actions, only_ids=only)
         except (ValueError, RuntimeError) as e:
             raise HTTPException(400, str(e)) from e
+        # learn rules from what the user approved (checked) and kept (unchecked) — in the background
+        approved = [i for i in action["items"] if only is None or i["message_id"] in only]
+        kept = [i for i in action["items"] if only is not None and i["message_id"] not in only]
+        if len(approved) >= 2 or kept:
+            learn_state[action_id] = {"status": "running"}
+
+            def learn():
+                from .learn import learn_from_cleanup
+
+                try:
+                    new = learn_from_cleanup(st, prefs_store, approved, kept)
+                    learn_state[action_id] = {"status": "done", "rules": [r.model_dump() for r in new]}
+                    log_event("rules_learned", action_id=action_id, approved=len(approved), kept=len(kept),
+                              added=len(new), rules=[r.text[:60] for r in new])
+                except Exception as e:
+                    log.warning("rule learning failed: %s", e)
+                    learn_state[action_id] = {"status": "failed", "error": str(e)[:200]}
+                    log_event("rules_learn_failed", action_id=action_id, error=str(e)[:200])
+
+            threading.Thread(target=learn, daemon=True).start()
+            result["learning"] = True
+        return result
+
+    @app.get("/api/cleanup/learn-status/{action_id}")
+    def learn_status(action_id: int, user: dict = Depends(require_user)):
+        return learn_state.get(action_id, {"status": "none"})
+
+    @app.get("/api/cleanup/learned")
+    def learned_rules(user: dict = Depends(require_user)):
+        return {"rules": [r.model_dump() for r in prefs_store.load().cleanup.learned]}
+
+    @app.post("/api/cleanup/learned/remove")
+    def remove_learned(body: dict, user: dict = Depends(require_user)):
+        text = (body or {}).get("text", "")
+        p = prefs_store.load()
+        keep = [r for r in p.cleanup.learned if r.text != text]
+        prefs_store.update({"cleanup": {"learned": [r.model_dump() for r in keep]}})
+        log_event("learned_rule_removed", text=text[:60])
+        return {"removed": len(keep) < len(p.cleanup.learned)}
 
     @app.post("/api/actions/{action_id}/reject")
     def reject(action_id: int, user: dict = Depends(require_user)):

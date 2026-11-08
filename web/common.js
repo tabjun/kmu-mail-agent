@@ -89,7 +89,8 @@ function actionCard(a, container, onChange, opts = {}) {
       try {
         const r = await api(`/api/actions/${a.id}/approve`, { method: "POST", body: JSON.stringify({ message_ids: ids }) });
         note.textContent = `✅ ${r.moved}통을 지운 편지함으로 옮겼습니다${r.failed.length ? ` (실패 ${r.failed.length}통)` : ""}.`;
-        onChange && onChange();
+        if (r.learning) watchLearning(a.id, note);
+        else onChange && onChange();
       } catch (e) { note.textContent = `실패: ${e.message}`; ok.disabled = no.disabled = false; }
     });
     no.addEventListener("click", async () => {
@@ -107,6 +108,56 @@ function actionCard(a, container, onChange, opts = {}) {
     card.append(row, note);
   }
   container.append(card);
+}
+
+// After an approval the server learns rules from the checked / unchecked mails. Show what it learned.
+async function watchLearning(actionId, note) {
+  const base = note.textContent;
+  note.textContent = `${base} 🧠 정리한 메일에서 규칙을 배우는 중…`;
+  for (let i = 0; i < 40; i++) {
+    await new Promise((r) => setTimeout(r, 2000));
+    const st = await api(`/api/cleanup/learn-status/${actionId}`);
+    if (st.status === "running") continue;
+    if (st.status === "done" && st.rules.length) {
+      note.innerHTML = `${esc(base)}<br>🧠 새 규칙 ${st.rules.length}개를 배웠습니다: ` +
+        st.rules.map((r) => `<b>${r.kind === "keep" ? "남기기 · " : ""}${esc(r.text)}</b>`).join(" / ") +
+        ` <button type="button" class="link" onclick="openLearnedRules()">배운 규칙 보기</button>`;
+    } else if (st.status === "done") {
+      note.textContent = `${base} 🧠 기존 규칙으로 충분해서 새로 배운 규칙은 없습니다.`;
+    } else {
+      note.textContent = `${base} (규칙 학습은 이번에 하지 못했습니다)`;
+    }
+    window.dispatchEvent(new Event("learned-rules-changed"));
+    return;
+  }
+}
+
+async function openLearnedRules() {
+  let dlg = document.getElementById("learned-dialog");
+  if (!dlg) {
+    dlg = document.createElement("dialog");
+    dlg.id = "learned-dialog";
+    dlg.className = "learned-dialog";
+    document.body.append(dlg);
+  }
+  const r = await api("/api/cleanup/learned");
+  const rows = r.rules.slice().reverse().map((x) => `<li>
+      <div class="lr-head"><span class="tag ${x.kind === "keep" ? "keep" : ""}">${x.kind === "keep" ? "남기기" : "정리"}</span>
+        <b>${esc(x.text)}</b></div>
+      <small class="muted">${esc((x.learned_at || "").replace("T", " "))} · 예: ${x.examples.map(esc).join(" / ") || "-"}</small>
+      <button type="button" class="link danger" data-text="${esc(x.text)}">이 규칙 지우기</button></li>`).join("");
+  dlg.innerHTML = `<div class="dlg-head"><h3>🧠 자동으로 배운 정리 규칙</h3><button type="button" class="link" data-close>닫기</button></div>
+    <p class="muted">불필요한 메일 정리를 승인할 때, 체크한 메일(정리)과 체크를 푼 메일(남기기)을 보고 메일 비서가 스스로 만든 규칙입니다.
+      다음 메일 확인부터 정리 후보를 고를 때 쓰입니다. 지우는 것은 여전히 승인한 뒤에만 합니다.</p>
+    ${rows ? `<ul class="learned-list">${rows}</ul>` : `<p class="muted">아직 배운 규칙이 없습니다. 정리 제안을 승인하면 여기에 쌓입니다.</p>`}`;
+  dlg.querySelector("[data-close]").addEventListener("click", () => dlg.close());
+  dlg.querySelectorAll("[data-text]").forEach((b) => b.addEventListener("click", async () => {
+    if (!confirm(`이 규칙을 지울까요?\n${b.dataset.text}`)) return;
+    await api("/api/cleanup/learned/remove", { method: "POST", body: JSON.stringify({ text: b.dataset.text }) });
+    window.dispatchEvent(new Event("learned-rules-changed"));
+    openLearnedRules();
+  }));
+  if (!dlg.open) dlg.showModal();
 }
 
 function openChatWindow(agent) {

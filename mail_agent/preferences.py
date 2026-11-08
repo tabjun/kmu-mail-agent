@@ -23,6 +23,15 @@ MODEL_CHOICES = {
 DEFAULT_MODEL = "claude-sonnet-5-5"
 
 
+class LearnedRule(BaseModel):
+    """A rule the app learned from the user's own cleanup approvals (shown in '배운 규칙')."""
+    text: str
+    kind: Literal["cleanup", "keep"] = "cleanup"
+    examples: list[str] = Field(default_factory=list, description="이 규칙을 배운 메일 제목 예시")
+    learned_at: str = ""
+    from_count: int = 0
+
+
 class CleanupPolicy(BaseModel):
     mode: Literal["off", "ask", "auto"] = Field(
         "ask", description="off=정리 안 함, ask=지우기 전에 승인받기, auto=규칙에 맞으면 바로 지운 편지함으로 이동")
@@ -35,6 +44,8 @@ class CleanupPolicy(BaseModel):
         "학생, 교내 부서, 연구재단, 공동연구자가 보낸 메일은 지우지 않는다",
         "논문 심사 결정(Decision) 메일과 영수증은 지우지 않는다",
     ], description="절대 지우지 말아야 할 기준 (정리 기준보다 우선)")
+    learned: list[LearnedRule] = Field(default_factory=list,
+                                       description="정리 승인에서 자동으로 배운 규칙 (사용자가 '배운 규칙'에서 지울 수 있음)")
 
 
 class CalendarPolicy(BaseModel):
@@ -86,8 +97,10 @@ class Preferences(BaseModel):
         if self.cleanup.mode != "off":
             lines.append("- 정리(삭제) 후보 기준 (cleanup_candidate=true):")
             lines += [f"  · {r}" for r in self.cleanup.rules]
+            lines += [f"  · {r.text} (사용자 승인에서 배움)" for r in self.cleanup.learned if r.kind == "cleanup"]
             lines.append("- 다음은 정리 후보에서 반드시 제외 (cleanup_candidate=false):")
             lines += [f"  · {r}" for r in self.cleanup.keep_rules]
+            lines += [f"  · {r.text} (사용자 승인에서 배움)" for r in self.cleanup.learned if r.kind == "keep"]
         else:
             lines.append("- 메일 정리 기능이 꺼져 있으므로 cleanup_candidate는 항상 false")
         return "\n".join(lines)

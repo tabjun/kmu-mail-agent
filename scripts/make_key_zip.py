@@ -4,7 +4,7 @@ r"""교수님께 따로 전달할 'API 키 ZIP'(.env 하나만 들어 있음)을
 
 - 결과: outputs\kmu-mail-agent-key.zip  (안에는 .env 파일 하나)
 - outputs/와 .env는 .gitignore에 있어 GitHub에 올라가지 않습니다. 저장소는 공개라서 키를 넣으면 안 됩니다.
-- 받는 쪽: 프로그램 폴더(C:\Users\<사용자>\kmu-mail-agent)에 이 ZIP을 풀어서
+- 받는 쪽: 프로그램 폴더(C:\Users\<사용자>\schedule)에 이 ZIP을 풀어서
   .env가 '설치하기.bat' 옆에 오게 한 뒤 설치하면 키 입력 단계를 건너뜁니다.
 - 키 값은 화면에 출력하지 않습니다.
 """

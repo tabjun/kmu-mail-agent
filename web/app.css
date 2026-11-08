@@ -280,3 +280,16 @@ kbd { border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5p
 .gcal-box { margin-top: 12px; padding: 12px 14px; border-radius: 10px; background: var(--accent-soft); display: flex; flex-direction: column; gap: 6px; }
 .gcal-box p { margin: 0; font-size: 13px; }
 .path-box code, .env-ok code { font-family: Consolas, "Cascadia Mono", "Courier New", monospace, sans-serif; }
+
+/* learned rules */
+.learned-dialog { max-width: 640px; width: calc(100% - 32px); border: 1px solid var(--line); border-radius: var(--radius);
+                  background: var(--surface); color: var(--fg); padding: 18px 20px; }
+.learned-dialog::backdrop { background: rgba(0, 0, 0, .45); }
+.dlg-head { display: flex; justify-content: space-between; align-items: center; }
+.dlg-head h3 { margin: 0; }
+.learned-list { list-style: none; padding: 0; margin: 10px 0 0; display: flex; flex-direction: column; gap: 10px; max-height: 60vh; overflow: auto; }
+.learned-list li { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; }
+.lr-head { display: flex; gap: 8px; align-items: baseline; }
+.tag { font-size: 11px; padding: 1px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); white-space: nowrap; }
+.tag.keep { background: color-mix(in srgb, var(--ok) 15%, transparent); color: var(--ok); }
+button.link.danger { color: var(--danger); align-self: flex-start; padding: 0; }
