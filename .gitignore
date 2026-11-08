@@ -13,3 +13,10 @@ __pycache__/
 # key files sent directly (never commit)
 .env.txt
 env.txt
+
+# never commit key files in any form
+*.zip
+env
+*.env
+.env.*
+!.env.example
