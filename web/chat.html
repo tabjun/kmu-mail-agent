@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>상세 설정</title>
+  <link rel="stylesheet" href="/web/app.css">
+</head>
+<body class="chat-page">
+  <header class="top compact">
+    <div class="brand">
+      <span class="logo" id="agent-emoji" aria-hidden="true">💬</span>
+      <div>
+        <h1 id="agent-name">상세 설정</h1>
+        <p class="sub" id="agent-desc">설정할 항목을 고르세요</p>
+      </div>
+    </div>
+    <div class="top-right">
+      <label class="model">AI 모델
+        <select id="model"></select>
+      </label>
+      <button id="switch-agent" class="link" hidden>다른 항목</button>
+      <button id="new-chat" class="link" hidden>새 대화</button>
+    </div>
+  </header>
+
+  <!-- agent picker (no ?agent=) -->
+  <main id="picker" class="picker" hidden>
+    <p class="muted">무엇을 설정할까요? 항목마다 전용 도우미가 있어서, 그 항목만 다루고 다른 설정은 건드리지 않습니다.</p>
+    <div id="agent-cards" class="agent-cards"></div>
+  </main>
+
+  <section class="chat" id="chat" hidden>
+    <div id="messages" class="messages" aria-live="polite"></div>
+    <div class="chips" id="chips"></div>
+    <form id="composer" class="composer">
+      <textarea id="input" rows="2" placeholder="예시를 누르거나 직접 말씀하세요" required></textarea>
+      <button type="submit" id="send">보내기</button>
+    </form>
+  </section>
+  <script src="/web/common.js"></script>
+  <script src="/web/chat.js"></script>
+</body>
+</html>

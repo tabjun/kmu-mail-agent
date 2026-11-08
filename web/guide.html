@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>사용법</title>
+  <link rel="stylesheet" href="/web/app.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">✉</span>
+      <div>
+        <h1>메일 비서 · 사용법</h1>
+        <p class="sub">실제 화면에 표시한 빨간 번호 순서대로 따라 하세요</p>
+      </div>
+    </div>
+    <nav class="top-nav">
+      <a href="/">대시보드</a>
+      <a href="/setup?step=2">기본 설정</a>
+      <a href="/guide" class="active">사용법</a>
+    </nav>
+  </header>
+
+  <main class="guide">
+    <p class="lead">메일 비서는 학교 Office 365 메일을 주기적으로 읽어, <strong>할 일은 Outlook 캘린더에 알림과 함께 넣고</strong>,
+      <strong>불필요한 메일은 "지워도 될까요?"라고 물어본 뒤 정리</strong>합니다. 처음 한 번만 아래 3단계를 하면 됩니다.</p>
+    <div class="note">이 PC에서 서비스가 자동으로 켜져 있으면 바탕화면의 <strong>'메일 비서'</strong> 아이콘이나
+      <a href="/">http://localhost:3000</a> 으로 언제든 열 수 있습니다.</div>
+
+    <h2>1단계 · 계정 연결</h2>
+    <figure class="shot" data-shot="01-setup-account.jpg" data-marks='[
+      {"n":1,"r":[333,256,675,46]},{"n":2,"r":[1017,256,90,46],"arrow":true},
+      {"n":3,"r":[333,316,774,175]},{"n":4,"r":[953,608,154,42]}]'></figure>
+    <ol class="callouts">
+      <li><span class="num">1</span><span>학교 메일 주소(예: professor@ms.kmu.ac.kr)를 입력합니다.</span></li>
+      <li><span class="num">2</span><span><strong>연결하기</strong>를 누릅니다.</span></li>
+      <li><span class="num">3</span><span>표시된 링크를 열고 코드를 입력한 뒤, 학교 계정을 고르고 권한 요청에 <strong>수락</strong>을 누릅니다. 끝나면 화면이 자동으로 바뀝니다.</span></li>
+      <li><span class="num">4</span><span>연결된 계정이 보이면 <strong>다음</strong>을 누릅니다. 계정은 여러 개 연결할 수 있습니다.</span></li>
+    </ol>
+
+    <h2>2단계 · 기본 설정</h2>
+    <figure class="shot" data-shot="02-setup-basic.jpg" data-marks='[
+      {"n":1,"r":[343,327,219,41]},{"n":2,"r":[343,540,390,40]},{"n":3,"r":[343,650,296,37]}]'></figure>
+    <ol class="callouts">
+      <li><span class="num">1</span><span>매일 <strong>'오늘 할 일'</strong> 알림을 받을 시각입니다. 이 시각에 캘린더 일정이 울리고, 본문에 우선순위별 체크리스트가 들어갑니다.</span></li>
+      <li><span class="num">2</span><span>보고서·심사처럼 <strong>준비가 필요한 마감</strong>은 며칠 전에 점검 알림을 받을지 고릅니다. 피드백 받을 시간을 벌기 위한 기능입니다.</span></li>
+      <li><span class="num">3</span><span>일정을 넣을 Outlook 캘린더(계정)를 고릅니다. 휴대폰 Outlook 앱에 같은 계정이 있으면 휴대폰으로 알림이 옵니다.</span></li>
+    </ol>
+    <figure class="shot" data-shot="03-setup-cleanup.jpg" data-marks='[
+      {"n":4,"r":[343,177,739,64]},{"n":5,"r":[343,528,219,38]},{"n":6,"r":[954,624,146,42],"arrow":true}]'></figure>
+    <ol class="callouts" start="4">
+      <li><span class="num">4</span><span>불필요한 메일 처리 방식입니다. 처음에는 <strong>지우기 전에 물어보기</strong>를 권합니다. 지운 메일은 지운 편지함으로 가므로 언제든 복구할 수 있습니다.</span></li>
+      <li><span class="num">5</span><span>메일을 얼마나 자주 확인할지 고릅니다.</span></li>
+      <li><span class="num">6</span><span><strong>저장하고 다음</strong>을 누릅니다.</span></li>
+    </ol>
+
+    <h2>3단계 · 저장하고 실행</h2>
+    <figure class="shot" data-shot="04-setup-run.jpg" data-marks='[
+      {"n":1,"r":[325,220,775,182]},{"n":2,"r":[325,412,154,46],"arrow":true},{"n":3,"r":[325,460,775,271]}]'></figure>
+    <ol class="callouts">
+      <li><span class="num">1</span><span>고른 설정을 확인합니다.</span></li>
+      <li><span class="num">2</span><span><strong>지금 실행하기</strong>를 누르면 바로 메일을 읽고 분류합니다(메일 수에 따라 1~3분).</span></li>
+      <li><span class="num">3</span><span>결과 요약이 나타나고, 캘린더에 마감·회의·점검 알림과 '오늘 할 일' 체크리스트가 들어갑니다.</span></li>
+    </ol>
+
+    <h2>매일 쓰는 화면 · 대시보드</h2>
+    <figure class="shot" data-shot="05-dashboard.jpg" data-marks='[
+      {"n":1,"r":[593,114,93,32]},{"n":2,"r":[237,213,280,38]},{"n":3,"r":[739,155,531,250],"arrow":false},{"n":4,"r":[1191,114,79,32]}]'></figure>
+    <ol class="callouts">
+      <li><span class="num">1</span><span>연결된 계정을 맨 위에서 확인하고, 필요하면 <strong>+ 계정 추가</strong>로 더 연결합니다.</span></li>
+      <li><span class="num">2</span><span><strong>AI 모델</strong>을 고릅니다. 기본은 Sonnet 5.5이고, 더 정확한 Opus 5.5도 쓸 수 있습니다.</span></li>
+      <li><span class="num">3</span><span><strong>연결 상태</strong>: 서비스 · Claude · Outlook 메일 · Outlook 캘린더가 모두 ✅이면 정상입니다.
+        캘린더 줄의 링크를 누르면 등록된 일정을 Outlook에서 바로 볼 수 있습니다. (예시 화면은 샘플 메일로 돌린 데모라 ⚠️로 보입니다.)</span></li>
+      <li><span class="num">4</span><span>❌가 있으면 <strong>다시 확인</strong>을 누르고, 안내대로 계정을 다시 연결합니다.</span></li>
+    </ol>
+    <figure class="shot" data-shot="05b-dashboard-todo.jpg" data-marks='[
+      {"n":5,"r":[1025,307,110,32]},{"n":6,"r":[156,345,1113,41],"arrow":true},{"n":7,"r":[339,390,930,158]}]'></figure>
+    <ol class="callouts" start="5">
+      <li><span class="num">5</span><span>기다리지 않고 바로 확인하고 싶으면 <strong>지금 메일 확인</strong>.</span></li>
+      <li><span class="num">6</span><span>할 일은 <strong>우선순위 · 날짜 · 시간 · 할 일</strong>만 한 줄로 보입니다.</span></li>
+      <li><span class="num">7</span><span>줄을 누르면 요약, 해야 할 일, 보낸 사람이 펼쳐집니다. 끝낸 일은 <strong>완료 표시</strong>.</span></li>
+    </ol>
+    <figure class="shot" data-shot="06-dashboard-cleanup.jpg" data-marks='[
+      {"n":8,"r":[174,602,146,42]},{"n":9,"r":[447,602,200,42],"arrow":true},{"n":10,"r":[739,594,471,40]}]'></figure>
+    <ol class="callouts" start="8">
+      <li><span class="num">8</span><span>"이런 메일 N통 왔는데 지울까요?" — 체크한 메일만 <strong>정리</strong>하거나 <strong>그대로 두기</strong>.</span></li>
+      <li><span class="num">9</span><span>정리 기준을 더하고 싶으면 <strong>정리할 메일 규칙 추가</strong>. 불필요 메일 전용 도우미가 열립니다.</span></li>
+      <li><span class="num">10</span><span>세부 규칙은 항목별 <strong>전용 도우미</strong>로 정합니다. 각 도우미는 자기 항목만 바꿀 수 있습니다.</span></li>
+    </ol>
+
+    <h2>세부 규칙 · 전용 도우미</h2>
+    <figure class="shot" data-shot="07-agent-picker.jpg" data-marks='[{"n":1,"r":[290,135,860,203]}]'></figure>
+    <ol class="callouts">
+      <li><span class="num">1</span><span>정리 규칙 / 우선순위·중요 발신자 / 캘린더·알림 중 하나를 고릅니다.</span></li>
+    </ol>
+    <figure class="shot" data-shot="08-cleanup-agent.jpg" data-marks='[
+      {"n":2,"r":[24,128,830,75]},{"n":3,"r":[24,210,640,180]},{"n":4,"r":[16,612,821,30],"arrow":true}]'></figure>
+    <ol class="callouts" start="2">
+      <li><span class="num">2</span><span>도우미는 먼저 <strong>지금 메일에서 무엇을 불필요하다고 분류했는지</strong> 보여줍니다(저장된 분류 결과 그대로).</span></li>
+      <li><span class="num">3</span><span>지금 적용 중인 기준과 지우지 않는 예외가 함께 보입니다.</span></li>
+      <li><span class="num">4</span><span>예시 버튼을 누르거나 직접 말하면 됩니다. 예: "학회 홍보는 지워도 돼", "OO학회 뉴스레터는 남겨줘".</span></li>
+    </ol>
+    <figure class="shot" data-shot="09-agent-guardrail.jpg" data-marks='[
+      {"n":5,"r":[24,212,975,170]},{"n":6,"r":[24,520,1215,48]}]'></figure>
+    <ol class="callouts" start="5">
+      <li><span class="num">5</span><span>규칙은 저장하기 전에 <strong>"이렇게 저장할까요?"</strong>로 확인합니다.</span></li>
+      <li><span class="num">6</span><span>다른 항목(예: 알림 시각)을 부탁하면 바꾸지 않고, 어느 메뉴에서 바꾸는지 알려줍니다. 항목이 섞이지 않게 하는 안전장치입니다.</span></li>
+    </ol>
+
+    <h2>자주 묻는 것</h2>
+    <dl class="kv">
+      <dt>메일이 정말 지워지나요?</dt><dd>승인한 메일만 <strong>지운 편지함</strong>으로 옮깁니다. Outlook에서 복구할 수 있고, 영구 삭제는 하지 않습니다.</dd>
+      <dt>휴대폰 알림은 어떻게 오나요?</dt><dd>Outlook 캘린더 일정의 알림입니다. 휴대폰 Outlook 앱(또는 캘린더 앱)에 같은 계정이 로그인되어 있으면 됩니다.</dd>
+      <dt>PC를 껐다 켜면요?</dt><dd>서비스 설치 스크립트로 등록해 두면 로그인할 때 자동으로 다시 켜집니다. PC가 꺼져 있는 동안 온 메일은 다음에 켜질 때 한꺼번에 확인합니다.</dd>
+      <dt>메일 내용은 어디로 가나요?</dt><dd>분류를 위해 Claude API(연구실 조직 계정)로 전송되고, 결과는 이 PC에만 저장됩니다.</dd>
+    </dl>
+  </main>
+
+  <script>
+    // Draws red boxes, number badges and arrows over each screenshot (coordinates in the 1440×731 capture frame).
+    document.querySelectorAll(".shot").forEach((fig) => {
+      const W = 1440, H = 731;
+      const marks = JSON.parse(fig.dataset.marks || "[]");
+      const img = Object.assign(document.createElement("img"), { src: "/web/guide/" + fig.dataset.shot, alt: "화면 예시", loading: "lazy" });
+      const ns = "http://www.w3.org/2000/svg";
+      const svg = document.createElementNS(ns, "svg");
+      svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+      svg.setAttribute("preserveAspectRatio", "none");
+      svg.innerHTML = `<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#e53935"/></marker></defs>`;
+      marks.forEach((m) => {
+        const [x, y, w, h] = m.r;
+        svg.insertAdjacentHTML("beforeend",
+          `<rect x="${x - 4}" y="${y - 4}" width="${w + 8}" height="${h + 8}" rx="10" fill="none" stroke="#e53935" stroke-width="4"/>
+           <circle cx="${x - 4}" cy="${y - 4}" r="17" fill="#e53935"/>
+           <text x="${x - 4}" y="${y + 3}" text-anchor="middle" font-size="20" font-weight="700" fill="#fff" font-family="sans-serif">${m.n}</text>`);
+        if (m.arrow) {
+          const ax = Math.min(x + w + 120, W - 10), ay = Math.max(y - 50, 14);
+          svg.insertAdjacentHTML("beforeend",
+            `<line x1="${ax}" y1="${ay}" x2="${x + w + 10}" y2="${y + h / 2}" stroke="#e53935" stroke-width="5" marker-end="url(#ah)"/>`);
+        }
+      });
+      fig.append(img, svg);
+    });
+  </script>
+</body>
+</html>

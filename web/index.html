@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>메일 비서</title>
+  <link rel="stylesheet" href="/web/app.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">✉</span>
+      <div>
+        <h1>메일 비서</h1>
+        <p class="sub">Outlook 메일 정리 · 캘린더 할 일 알림</p>
+      </div>
+    </div>
+    <nav class="top-nav">
+      <a href="/" class="active">대시보드</a>
+      <a href="/setup?step=2">기본 설정</a>
+      <a href="/guide">사용법</a>
+    </nav>
+  </header>
+
+  <main class="dash">
+    <section id="onboarding" class="banner" hidden>
+      <h2>처음 오셨나요? 설정 마법사로 3단계만 하면 됩니다</h2>
+      <ol class="steps">
+        <li><strong>① 계정 연결</strong><span>학교 Office 365 주소를 입력하고 연결합니다.</span></li>
+        <li><strong>② 기본 설정</strong><span>알림 시각, 불필요한 메일 처리, 점검 알림을 고릅니다.</span></li>
+        <li><strong>③ 저장하고 실행</strong><span>바로 메일을 읽어 캘린더에 오늘 할 일을 만듭니다.</span></li>
+      </ol>
+      <a class="button primary-big" href="/setup">설정 마법사 시작 →</a>
+    </section>
+
+    <!-- 1행: 계정 + 상태 (먼저 확인) -->
+    <div class="grid">
+      <section class="card" id="card-accounts">
+        <div class="card-head">
+          <h2>연결된 계정</h2>
+          <a class="button secondary small" href="/setup">+ 계정 추가</a>
+        </div>
+        <ul id="account-list" class="list"></ul>
+        <label class="model-row">🤖 AI 모델
+          <select id="model-select"></select>
+        </label>
+        <p class="muted">메일 분류와 설정 도우미가 쓰는 모델입니다. 바꾸면 다음 메일 확인부터 적용됩니다.</p>
+      </section>
+
+      <section class="card" id="card-status">
+        <div class="card-head">
+          <h2>연결 상태 <span id="health-badge" class="pill"></span></h2>
+          <button id="recheck" class="secondary small">다시 확인</button>
+        </div>
+        <ul id="health-list" class="health"><li class="muted">확인하는 중…</li></ul>
+        <p class="muted mobile-hint">📱 등록된 일정과 알림은 휴대폰 <strong>Outlook 앱</strong>(같은 계정)이나 Outlook 웹 캘린더에서 그대로 볼 수 있습니다.</p>
+      </section>
+    </div>
+
+    <!-- 2행: 할 일 (항목만, 펼치면 상세) -->
+    <section class="card" id="card-todo">
+      <div class="card-head">
+        <h2>할 일 <span class="muted" id="todo-count"></span></h2>
+        <div class="row tight">
+          <button id="run-now" class="small">지금 메일 확인</button>
+          <button class="secondary small" data-agent="priority">📌 우선순위 규칙</button>
+        </div>
+      </div>
+      <p class="muted" id="last-check"></p>
+      <details id="run-details" hidden>
+        <summary>마지막 실행 결과 보기</summary>
+        <pre id="run-result" class="digest"></pre>
+      </details>
+      <div id="todo-list" class="muted">불러오는 중…</div>
+    </section>
+
+    <!-- 3행: 정리 제안 + 내 설정 -->
+    <div class="grid">
+      <section class="card" id="card-actions">
+        <h2>불필요한 메일 정리 <span id="badge" class="badge" hidden>0</span></h2>
+        <div id="actions-list"></div>
+      </section>
+
+      <section class="card" id="card-prefs">
+        <div class="card-head">
+          <h2>내 설정</h2>
+          <a class="button secondary small" href="/setup?step=2">기본 설정 수정</a>
+        </div>
+        <div id="prefs-body" class="muted">불러오는 중…</div>
+        <p class="muted agent-hint">항목별 전용 도우미로 세부 규칙을 정할 수 있습니다.</p>
+        <div class="row">
+          <button class="secondary" data-agent="cleanup">🧹 정리 규칙</button>
+          <button class="secondary" data-agent="priority">📌 우선순위·중요 발신자</button>
+          <button class="secondary" data-agent="calendar">📅 캘린더·알림</button>
+        </div>
+      </section>
+    </div>
+  </main>
+  <script src="/web/common.js"></script>
+  <script src="/web/dashboard.js"></script>
+</body>
+</html>

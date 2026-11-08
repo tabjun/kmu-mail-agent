@@ -1,0 +1,30 @@
+# 사용자별 분류 규칙. 이 내용은 Claude 시스템 프롬프트에 그대로 들어갑니다.
+# (자주 바꾸지 않을수록 프롬프트 캐시가 잘 맞습니다.)
+
+owner:
+  name: "교수님"            # 예: "손OO 교수"
+  role: "교수"
+  affiliation: "계명대학교"
+  email_domains: ["ms.kmu.ac.kr", "kmu.ac.kr"]
+
+vip_senders:
+  - pattern: "@nrf.re.kr"
+    note: "한국연구재단 (과제 협약·보고서·평가)"
+  - pattern: "@iitp.kr"
+    note: "정보통신기획평가원 (과제)"
+  - pattern: "연구처"
+    note: "교내 연구처 (연구비, 과제 행정)"
+  - pattern: "교무처"
+    note: "교내 교무처 (수업, 성적, 학사 일정)"
+
+priority_hints:
+  - "본인 연구실 대학원생이 보낸 면담·논문 검토·서명 요청은 action_required=true로 본다."
+  - "학과 사무실이나 행정 부서의 '제출', '회신', '취합' 요청은 마감일 기준으로 판단한다."
+  - "학회 Call for Papers, 저널 홍보, 세미나 홍보처럼 참석 의무가 없는 안내는 fyi로 둔다."
+  - "논문 심사(review) 요청은 수락/거절 회신 기한이 있으면 action_required=true다."
+  - "Microsoft 365, 포털 시스템의 계정·보안 알림 중 본인 조치가 필요한 것은 urgent다."
+
+# Claude를 호출하지 않고 바로 '참고'로 분류할 메일 (비용 절약).
+skip:
+  subject_contains: ["(광고)", "[광고]"]
+  sender_contains: []

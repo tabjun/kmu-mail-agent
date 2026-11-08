@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>KMU 메일 비서</title>
+  <!-- Office.js must be loaded from Microsoft's CDN -->
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <script src="vendor/msal-browser-5.26.0.min.js"></script>
+  <script src="config.js"></script>
+  <link rel="stylesheet" href="taskpane.css">
+</head>
+<body>
+  <nav class="tabs" role="tablist">
+    <button class="tab active" data-view="mail" role="tab">이 메일</button>
+    <button class="tab" data-view="list" role="tab">할 일 목록</button>
+    <button class="tab" data-view="settings" role="tab" aria-label="설정">⚙</button>
+  </nav>
+
+  <main>
+    <section id="view-mail" class="view">
+      <div id="status" class="status">메일을 읽는 중…</div>
+      <article id="result" hidden>
+        <div class="badge-row">
+          <span id="priority" class="badge"></span>
+          <span id="category" class="chip"></span>
+          <span id="cached" class="muted small"></span>
+        </div>
+        <p id="due" class="due"></p>
+        <p id="summary" class="summary"></p>
+        <ul id="actions" class="actions"></ul>
+        <div id="calendar"></div>
+        <p id="reason" class="muted small"></p>
+
+        <div class="row">
+          <button id="btn-done" class="secondary">완료</button>
+          <button id="btn-retry" class="secondary">다시 분석</button>
+        </div>
+
+        <details class="feedback">
+          <summary>우선순위가 틀렸나요?</summary>
+          <label>올바른 우선순위
+            <select id="fb-priority">
+              <option value="urgent">🔴 긴급</option>
+              <option value="today">🟠 오늘</option>
+              <option value="this_week">🟡 이번 주</option>
+              <option value="this_month">🟢 이번 달</option>
+              <option value="later">🔵 이후</option>
+              <option value="fyi">⚪ 참고</option>
+            </select>
+          </label>
+          <label>이유 (선택)
+            <input id="fb-note" maxlength="300" placeholder="예: 학과 공지는 보통 참고용">
+          </label>
+          <button id="btn-feedback">고치기</button>
+          <p class="muted small">고친 내용은 다음 분류부터 예시로 쓰입니다.</p>
+        </details>
+      </article>
+    </section>
+
+    <section id="view-list" class="view" hidden>
+      <div id="list-status" class="status"></div>
+      <div id="list"></div>
+    </section>
+
+    <section id="view-settings" class="view" hidden>
+      <label>API 주소
+        <input id="set-api" placeholder="https://localhost:3000">
+      </label>
+      <label>개발용 API 키 (API_KEY를 설정했을 때만)
+        <input id="set-key" type="password" autocomplete="off">
+      </label>
+      <button id="btn-save">저장</button>
+      <p id="auth-info" class="muted small"></p>
+    </section>
+  </main>
+  <script src="taskpane.js"></script>
+</body>
+</html>

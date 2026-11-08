@@ -1,0 +1,11 @@
+# secrets & personal data — never commit
+.env
+data/
+outputs/
+secrets/
+# local tooling
+.venv/
+.claude/
+__pycache__/
+*.pyc
+.pytest_cache/
