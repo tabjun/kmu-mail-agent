@@ -164,7 +164,26 @@ class OutlookCalendar:
         }
         if spec.location:
             payload["location"] = {"displayName": spec.location}
-        return self.client.post("/me/events", payload).get("id")
+        try:
+            return self.client.post("/me/events", payload).get("id")
+        except Exception as e:
+            # The event already exists in Outlook (e.g. local data was reset or the app reinstalled):
+            # find it by its transactionId and refresh it instead of failing.
+            if "ErrorDuplicateTransactionId" not in getattr(getattr(e, "response", None), "text", ""):
+                raise
+            existing = self.find_by_key(spec)
+            if not existing:
+                raise
+            self.update(spec, existing)
+            return existing
+
+    def find_by_key(self, spec: EventSpec) -> str | None:
+        fmt = "%Y-%m-%dT%H:%M:%SZ"
+        start = (spec.start - timedelta(days=1)).astimezone(timezone.utc).strftime(fmt)
+        end = (spec.end + timedelta(days=1)).astimezone(timezone.utc).strftime(fmt)
+        data = self.client.get("/me/calendarView", params={
+            "startDateTime": start, "endDateTime": end, "$select": "id,transactionId", "$top": "200"})
+        return next((ev["id"] for ev in data.get("value", []) if ev.get("transactionId") == spec.key), None)
 
 
     def update(self, spec: EventSpec, event_id: str) -> str | None:

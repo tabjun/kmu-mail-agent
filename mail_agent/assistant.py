@@ -177,9 +177,9 @@ class Assistant:
         from .sources import SampleMailSource
 
         rt = graph_runtime(s, self.store)
-        demo = not rt.mail_clients or s.mail_source == "sample"
+        demo = rt.mail_source() is None or s.mail_source == "sample"
         s.max_messages = limit
-        source = SampleMailSource(PROJECT_ROOT / "samples" / "emails.json") if demo else GraphMailSource(rt.mail_clients, s)
+        source = SampleMailSource(PROJECT_ROOT / "samples" / "emails.json") if demo else rt.mail_source()
         now = datetime.now(s.timezone)
         emails = source.fetch(None if demo else now - timedelta(days=days))[:limit]
         llm = ClaudeLLM(s)

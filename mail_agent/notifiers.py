@@ -22,7 +22,14 @@ class ConsoleNotifier:
     name = "console"
 
     def send(self, subject, text, html_body, now):
-        print("\n" + text + "\n", flush=True)
+        import sys
+
+        out = "\n" + text + "\n"
+        try:
+            print(out, flush=True)
+        except UnicodeEncodeError:  # Windows console in cp949 cannot print emoji
+            enc = getattr(sys.stdout, "encoding", None) or "utf-8"
+            print(out.encode(enc, "replace").decode(enc, "replace"), flush=True)
         return "printed"
 
 

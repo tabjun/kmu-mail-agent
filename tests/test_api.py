@@ -78,3 +78,19 @@ def test_addin_static_served(settings):  # noqa: F811
     r = client.get("/addin/taskpane.html")
     assert r.status_code == 200 and "office.js" in r.text
     assert client.get("/addin/manifest.xml").status_code == 200
+
+
+def test_imap_endpoint_accepts_json_body(settings, monkeypatch):  # noqa: F811
+    import mail_agent.imap_mail as im
+
+    seen = {}
+
+    def fake_add(self, username, password, host=None, port=993):
+        seen.update(username=username, password=password)
+        return {"username": username, "host": "imap.gmail.com", "port": 993, "total": 3}
+
+    monkeypatch.setattr(im.ImapAccountStore, "add", fake_add)
+    client, _ = make_client(settings, ScriptedLLM({}))
+    r = client.post("/api/accounts/imap", json={"username": "a@gmail.com", "password": "abcd efgh ijkl mnop"})
+    assert r.status_code == 200, r.text
+    assert seen == {"username": "a@gmail.com", "password": "abcdefghijklmnop"}  # spaces removed

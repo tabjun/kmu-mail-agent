@@ -23,23 +23,45 @@ class Runtime:
     auth: object | None            # msgraph.GraphAuth
     mail_clients: list             # msgraph.GraphClient per selected account
     calendar_client: object | None # msgraph.GraphClient that owns the calendar
-    mail_actions: object | None    # msgraph.MailActions
+    mail_actions: object | None    # msgraph.MailActions (Graph + IMAP accounts)
+    imap_clients: list | None = None
+
+    def mail_source(self):
+        """Every connected mailbox — Microsoft (Graph) and IMAP (Gmail, Naver …) — as one source."""
+        from .imap_mail import CombinedMailSource, ImapMailSource
+        from .msgraph import GraphMailSource
+
+        sources = []
+        if self.mail_clients:
+            sources.append(GraphMailSource(self.mail_clients, self.settings))
+        if self.imap_clients:
+            sources.append(ImapMailSource(self.imap_clients, self.settings))
+        return CombinedMailSource(sources) if sources else None
 
 
 def graph_runtime(settings: Settings, store: Store | None = None, need_graph: bool = True) -> Runtime:
     store = store or Store(settings.db_path)
-    if not need_graph or not settings.ms_client_id:
+    if not need_graph:
         return Runtime(settings, store, None, [], None, None)
+    from .imap_mail import ImapAccountStore
     from .msgraph import GraphAuth, GraphClient, MailActions
 
-    auth = GraphAuth(settings)
-    signed_in = auth.accounts()
     wanted = [a.lower() for a in settings.mail_accounts]
-    selected = signed_in if "all" in wanted else [a for a in signed_in if a.lower() in wanted]
-    clients = [GraphClient(auth, u) for u in selected]
-    owner = settings.calendar_account if settings.calendar_account in signed_in else (selected[0] if selected else None)
-    cal = GraphClient(auth, owner) if owner else None
-    return Runtime(settings, store, auth, clients, cal, MailActions(clients) if clients else None)
+    pick = (lambda names: names) if "all" in wanted else (lambda names: [n for n in names if n.lower() in wanted])
+
+    auth, clients, cal = None, [], None
+    if settings.ms_client_id:
+        auth = GraphAuth(settings)
+        signed_in = auth.accounts()
+        selected = pick(signed_in)
+        clients = [GraphClient(auth, u) for u in selected]
+        # the calendar always lives in a Microsoft account (Outlook), even when mail comes from Gmail
+        owner = settings.calendar_account if settings.calendar_account in signed_in else \
+            (selected[0] if selected else (signed_in[0] if signed_in else None))
+        cal = GraphClient(auth, owner) if owner else None
+    imap = [c for c in ImapAccountStore(settings).clients() if c.username in pick([c.username])]
+    actions = MailActions(clients + imap) if (clients or imap) else None
+    return Runtime(settings, store, auth, clients, cal, actions, imap)
 
 
 _run_lock = threading.Lock()
@@ -66,9 +88,9 @@ def run_pipeline(settings: Settings, *, source=None, llm=None, store: Store | No
                 settings.cleanup_mode = "ask"  # never try to move sample ids in a real mailbox
         rt = graph_runtime(settings, store, need_graph=source is None or settings.calendar_provider == "outlook")
         if source is None:
-            if not rt.mail_clients:
-                raise RuntimeError("연결된 Microsoft 계정이 없습니다. 웹 화면의 '계정'에서 계정을 추가하세요.")
-            source = GraphMailSource(rt.mail_clients, settings)
+            source = rt.mail_source()
+            if source is None:
+                raise RuntimeError("연결된 메일 계정이 없습니다. 대시보드의 '+ 계정 추가'에서 연결하세요.")
         deps = Deps(settings=settings, llm=llm or ClaudeLLM(settings), store=rt.store, source=source,
                     calendar=make_calendar(settings, rt.calendar_client),
                     notifiers=make_notifiers(settings, rt.calendar_client),
@@ -109,12 +131,19 @@ class Monitor:
             prefs = settings.apply_preferences()
             interval = max(5, prefs.monitor.interval_minutes) * 60
             if prefs.monitor.enabled and prefs.setup_completed:
+                from .activity import log_event
+
+                log_event("run_start", trigger="monitor")
                 try:
                     out = run_pipeline(settings)
+                    log_event("run_done", trigger="monitor", new=len(out.get("triaged", [])),
+                              calendar_created=len(out.get("calendar_created", [])),
+                              cleanup=(out.get("cleanup") or {}).get("count"), errors=out.get("errors", []))
                     self.last_run = {"at": datetime.now(settings.timezone).isoformat(timespec="minutes"),
                                      "new": len(out.get("triaged", [])), "errors": out.get("errors", [])}
                 except Exception as e:
                     log.exception("monitor run failed")
+                    log_event("run_failed", trigger="monitor", error=f"{type(e).__name__}: {str(e)[:400]}")
                     self.last_run = {"at": datetime.now(settings.timezone).isoformat(timespec="minutes"),
                                      "error": str(e)[:300]}
             self._stop.wait(interval)

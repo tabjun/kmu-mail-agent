@@ -49,7 +49,26 @@ class GraphAuth:
         """Usernames signed in on this PC (work/school and personal Microsoft accounts)."""
         return [a["username"] for a in self.app.get_accounts()]
 
+    def login_interactive(self, login_hint: str | None = None, timeout: int = 300) -> str:
+        """One-click sign-in: opens the Microsoft login page in the default browser and
+        receives the result on http://localhost (no code to copy). Returns the username."""
+        result = self.app.acquire_token_interactive(
+            SCOPES, login_hint=login_hint or None, prompt="select_account", timeout=timeout,
+            success_template="<html><head><meta charset='utf-8'><title>로그인 완료</title></head><body style='font-family:sans-serif;text-align:center;padding-top:80px'><h2>✅ 연결되었습니다</h2><p>이 창을 닫고 메일 비서 화면으로 돌아가세요.</p></body></html>", error_template="<html><head><meta charset='utf-8'><title>로그인 실패</title></head><body style='font-family:sans-serif;text-align:center;padding-top:80px'><h2>연결하지 못했습니다</h2><p>$error: $error_description</p></body></html>")
+        self._save()
+        if "access_token" not in result:
+            raise RuntimeError(result.get("error_description") or result.get("error") or "login failed")
+        return (result.get("id_token_claims") or {}).get("preferred_username", "")
+
     def add_account(self) -> str:
+        """Sign in one more account: browser login first, device code as a fallback (e.g. no browser)."""
+        try:
+            return self.login_interactive()
+        except Exception as e:  # headless / remote session
+            print(f"브라우저 로그인을 쓸 수 없어 코드 입력 방식으로 진행합니다 ({e})", flush=True)
+            return self.add_account_device()
+
+    def add_account_device(self) -> str:
         """Device-code sign-in for one more account. Returns its username."""
         flow = self.app.initiate_device_flow(scopes=SCOPES)
         if "user_code" not in flow:
@@ -82,6 +101,7 @@ class GraphAuth:
 
 
 class GraphClient:
+    kind = "graph"
     """Graph calls on behalf of one signed-in account."""
 
     def __init__(self, auth: GraphAuth, username: str | None = None):
@@ -184,12 +204,16 @@ class GraphMailSource:
 class MailActions:
     """Mailbox-changing operations, routed to the account that owns each message."""
 
-    def __init__(self, clients: list[GraphClient]):
-        self.by_account = {c.username.lower(): c for c in clients if c.username}
-        self.default = clients[0] if clients else None
+    def __init__(self, clients: list):
+        # The same address can be both a Microsoft account and an IMAP (Gmail) account,
+        # so route by kind first (IMAP ids start with "imap:"), then by account.
+        self.graph = {c.username.lower(): c for c in clients if c.username and getattr(c, "kind", "graph") != "imap"}
+        self.imap = {c.username.lower(): c for c in clients if c.username and getattr(c, "kind", "") == "imap"}
 
     def move_to_deleted(self, account: str | None, message_id: str) -> str:
-        client = self.by_account.get((account or "").lower(), self.default)
+        pool = self.imap if message_id.startswith("imap:") else self.graph
+        key = (account or "").lower()
+        client = pool.get(key) or (next(iter(pool.values())) if len(pool) == 1 else None)
         if client is None:
-            raise RuntimeError("no signed-in account for this message")
+            raise RuntimeError(f"이 메일의 계정({account})이 연결되어 있지 않습니다")
         return client.move_to_deleted(message_id)

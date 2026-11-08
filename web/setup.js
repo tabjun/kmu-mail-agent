@@ -2,6 +2,7 @@
 "use strict";
 
 let accounts = [];
+let accountDetails = [];
 
 function go(step) {
   document.querySelectorAll(".step").forEach((s) => (s.hidden = s.id !== `step-${step}`));
@@ -20,10 +21,12 @@ function go(step) {
 async function loadAccounts() {
   const r = await api("/api/accounts");
   accounts = r.accounts;
+  accountDetails = r.details || accounts.map((u) => ({ username: u, type: "microsoft", label: "Microsoft" }));
   const ul = $("account-list");
   ul.replaceChildren();
   if (!accounts.length) ul.innerHTML = "<li class='muted'>아직 없습니다.</li>";
-  accounts.forEach((a) => ul.insertAdjacentHTML("beforeend", `<li><span>✅ ${esc(a)}</span></li>`));
+  accountDetails.forEach((a) => ul.insertAdjacentHTML("beforeend",
+    `<li><span>✅ ${esc(a.username)}</span><span class="muted">${esc(a.label)}</span></li>`));
   $("to-2").disabled = !accounts.length;
 }
 
@@ -32,6 +35,26 @@ async function connect(e) {
   const email = $("account-email").value.trim();
   const box = $("device");
   box.hidden = false;
+  $("connect").disabled = true;
+  try {
+    const st = await connectAccount(email, (t) => { box.innerHTML = t; });
+    box.innerHTML = st.mismatch
+      ? `⚠ 입력한 주소(${esc(email)})와 다른 계정 <strong>${esc(st.username)}</strong>으로 연결됐습니다. 맞다면 그대로 진행하세요.`
+      : `✅ ${esc(st.username)} 연결 완료`;
+    $("account-email").value = "";
+    $("connect").disabled = false;
+    loadAccounts();
+    return;
+  } catch (err) {
+    box.innerHTML = `브라우저 로그인을 완료하지 못했습니다 (${esc(err.message)}).<br>
+      <button type="button" id="use-code" class="secondary small">코드 입력 방식으로 연결</button>`;
+    $("connect").disabled = false;
+    $("use-code").addEventListener("click", () => connectWithCode(email));
+  }
+}
+
+async function connectWithCode(email) {
+  const box = $("device");
   box.innerHTML = "로그인 코드를 만드는 중…";
   $("connect").disabled = true;
   try {
@@ -75,7 +98,9 @@ async function fillForm() {
   $("f-model").value = p.triage_model;
   const cal = $("f-calendar");
   cal.replaceChildren();
-  accounts.forEach((a) => cal.append(new Option(`${a}의 Outlook 캘린더`, a, false, a === p.calendar_account)));
+  const msAccounts = accountDetails.filter((a) => a.type === "microsoft").map((a) => a.username);
+  if (!msAccounts.length) cal.append(new Option("Microsoft 계정을 연결하면 Outlook 캘린더를 고를 수 있습니다", ""));
+  msAccounts.forEach((a) => cal.append(new Option(`${a}의 Outlook 캘린더`, a, false, a === p.calendar_account)));
 }
 
 function formPatch() {
@@ -141,6 +166,37 @@ async function run() {
 }
 
 $("account-form").addEventListener("submit", connect);
+
+// ---------- Gmail / Naver (IMAP, app password) ----------
+document.querySelectorAll(".acct-tab").forEach((t) => t.addEventListener("click", () => {
+  document.querySelectorAll(".acct-tab").forEach((x) => x.classList.toggle("active", x === t));
+  $("kind-ms").hidden = t.dataset.kind !== "ms";
+  $("kind-imap").hidden = t.dataset.kind !== "imap";
+}));
+$("imap-email").addEventListener("change", async () => {
+  const u = $("imap-email").value.trim();
+  if (!u.includes("@")) return;
+  try {
+    const h = await api(`/api/accounts/imap-help?username=${encodeURIComponent(u)}`);
+    $("imap-help").innerHTML = esc(h.help).replace(/(https:\/\/\S+)/, '<a href="$1" target="_blank" rel="noopener">$1</a>');
+  } catch (e) { /* ignore */ }
+});
+$("imap-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const box = $("device");
+  box.hidden = false;
+  box.textContent = "메일 서버에 연결하는 중…";
+  $("imap-connect").disabled = true;
+  try {
+    const r = await api("/api/accounts/imap", { method: "POST",
+      body: JSON.stringify({ username: $("imap-email").value.trim(), password: $("imap-pass").value }) });
+    box.innerHTML = `✅ ${esc(r.username)} 연결 완료 · 받은편지함 ${r.total ?? "-"}통`;
+    $("imap-pass").value = "";
+    loadAccounts();
+  } catch (err) {
+    box.textContent = err.message.replace(/^400 /, "");
+  } finally { $("imap-connect").disabled = false; }
+});
 $("to-2").addEventListener("click", () => go(2));
 $("save-2").addEventListener("click", saveStep2);
 $("run").addEventListener("click", run);

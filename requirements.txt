@@ -11,6 +11,8 @@ tzdata
 fastapi>=0.160
 uvicorn[standard]>=0.50
 pyjwt[crypto]>=2.10
+# Gmail/Naver app passwords are kept in the OS credential store
+keyring>=25
 # Claude Desktop integration
 mcp>=2.3
 # optional: Google Calendar

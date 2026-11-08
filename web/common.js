@@ -12,11 +12,32 @@ function store(key, value) {
   return value || "";
 }
 
+function uiLog(type, extra) {
+  try {
+    const body = JSON.stringify(Object.assign({ type, page: location.pathname + location.search }, extra || {}));
+    if (navigator.sendBeacon) navigator.sendBeacon("/api/log", new Blob([body], { type: "application/json" }));
+    else fetch("/api/log", { method: "POST", headers: { "Content-Type": "application/json" }, body });
+  } catch (e) { /* logging must never break the page */ }
+}
+window.addEventListener("error", (e) => uiLog("js_error", { message: String(e.message), source: e.filename, line: e.lineno }));
+window.addEventListener("unhandledrejection", (e) => uiLog("js_error", { message: String(e.reason && e.reason.message || e.reason) }));
+document.addEventListener("click", (e) => {
+  const el = e.target.closest("button, a, summary, input[type=checkbox], input[type=radio]");
+  if (!el) return;
+  const label = (el.innerText || el.value || el.getAttribute("aria-label") || el.id || "").trim().slice(0, 60);
+  uiLog("click", { target: `${el.tagName.toLowerCase()}${el.id ? "#" + el.id : ""}: ${label}` });
+}, true);
+window.addEventListener("load", () => uiLog("page_view"));
+
 async function api(path, options = {}) {
   const res = await fetch(path, Object.assign({ headers: { "Content-Type": "application/json" } }, options));
   if (!res.ok) {
     let detail = res.statusText;
-    try { detail = (await res.json()).detail || detail; } catch (e) { /* not json */ }
+    try {
+      const d = (await res.json()).detail;
+      detail = Array.isArray(d) ? d.map((x) => x.msg || JSON.stringify(x)).join(", ") : (d || detail);
+    } catch (e) { /* not json */ }
+    uiLog("api_fail", { target: `${(options.method || "GET")} ${path.split("?")[0]}`, detail: `${res.status} ${String(detail).slice(0, 200)}` });
     throw new Error(`${res.status} ${detail}`);
   }
   return res.json();
@@ -93,4 +114,20 @@ function openChatWindow(agent) {
   const w = window.open(url, "mailAgentChat", "width=560,height=820,menubar=no,toolbar=no,location=no");
   if (!w) location.href = url; // popup blocked → same tab
   else w.focus();
+}
+
+/* One-click Microsoft login. Opens the sign-in page in the browser; resolves when the app finished connecting.
+   onUpdate(text) shows progress. Falls back to the device-code flow if the browser login cannot start. */
+async function connectAccount(expected, onUpdate) {
+  const say = (t) => onUpdate && onUpdate(t);
+  say("Microsoft 로그인 창을 여는 중…");
+  const start = await api("/api/accounts/login", { method: "POST", body: JSON.stringify({ expected }) });
+  say("새로 열린 Microsoft 창에서 계정을 고르고 <strong>수락</strong>을 누르세요. 끝나면 여기서 자동으로 연결이 완료됩니다.");
+  for (let i = 0; i < 120; i++) {
+    await new Promise((r) => setTimeout(r, 2500));
+    const st = await api(`/api/accounts/device-login/${encodeURIComponent(start.login_id)}`);
+    if (st.status === "done") return st;
+    if (st.status === "failed") throw new Error(st.error || "로그인하지 못했습니다");
+  }
+  throw new Error("시간이 초과되었습니다. 다시 시도해 주세요.");
 }

@@ -31,11 +31,31 @@
     <!-- STEP 1 -->
     <section class="card step" id="step-1">
       <h2>1. 메일을 읽을 계정을 연결하세요</h2>
-      <p class="muted">학교 Office 365 계정(예: professor@ms.kmu.ac.kr)을 입력하고 연결하기를 누르세요. 여러 개를 연결할 수 있습니다.</p>
-      <form id="account-form" class="inline-form">
-        <input id="account-email" type="email" placeholder="example@ms.kmu.ac.kr" required autocomplete="email">
-        <button type="submit" id="connect">연결하기</button>
-      </form>
+      <div class="acct-tabs" role="tablist">
+        <button type="button" class="acct-tab active" data-kind="ms">🏫 학교 Office 365 · Outlook</button>
+        <button type="button" class="acct-tab" data-kind="imap">✉ Gmail · 네이버 · 다음</button>
+      </div>
+
+      <div id="kind-ms">
+        <p class="muted">학교 Office 365 계정(예: professor@ms.kmu.ac.kr)을 입력하고 <strong>연결하기</strong>를 누르세요.
+          Microsoft 로그인 창에서 수락하면 <strong>메일과 Outlook 캘린더</strong>가 함께 연결됩니다.</p>
+        <form id="account-form" class="inline-form">
+          <input id="account-email" type="email" placeholder="example@ms.kmu.ac.kr" required autocomplete="email">
+          <button type="submit" id="connect">연결하기</button>
+        </form>
+      </div>
+
+      <div id="kind-imap" hidden>
+        <p class="muted">Gmail·네이버·다음 메일은 <strong>앱 비밀번호</strong>로 연결합니다(일반 로그인 비밀번호는 쓰지 않습니다).
+          비밀번호는 이 PC의 Windows 자격 증명 관리자에만 저장됩니다.
+          <br>할 일 알림은 Outlook 캘린더로 오므로, 캘린더용 Microsoft 계정도 하나 연결해 두세요.</p>
+        <form id="imap-form" class="imap-form">
+          <input id="imap-email" type="email" placeholder="example@gmail.com" required autocomplete="email">
+          <input id="imap-pass" type="password" placeholder="앱 비밀번호 (16자리)" required autocomplete="off">
+          <button type="submit" id="imap-connect">연결하기</button>
+        </form>
+        <p id="imap-help" class="muted small-help"></p>
+      </div>
       <div id="device" class="device" hidden></div>
       <h3 class="small-title">연결된 계정</h3>
       <ul id="account-list" class="list"></ul>

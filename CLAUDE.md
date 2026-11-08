@@ -9,6 +9,9 @@ Office 365(Outlook) 메일을 주기적으로 읽어 Claude로 분류하고, 할
 웹 화면: `http://localhost:3000/` (대시보드), `/setup` (설정 마법사), `/guide` (사용법).
 
 ## 처음 설치 (Windows) — 사용자가 "설치해줘"라고 하면 이 순서로
+가장 간단한 방법은 `scripts\setup_windows.ps1`(= `설치하기.bat`) 하나로 1~6단계를 모두 하는 것입니다.
+키 입력 단계는 사용자가 직접 붙여 넣게 두거나, 사용자가 대화로 준 값을 `.env`에만 쓰고 `-NoPrompt`로 실행하세요.
+아래는 그 스크립트가 하는 일을 단계별로 풀어 쓴 것입니다.
 1. Python 3.10+ 확인: `python --version`
 2. 가상환경과 패키지:
    - `python -m venv .venv`
@@ -30,6 +33,8 @@ Office 365(Outlook) 메일을 주기적으로 읽어 Claude로 분류하고, 할
 - 연결 상태 ❌ "다시 로그인이 필요합니다" → 대시보드 '+ 계정 추가'에서 같은 계정을 다시 연결합니다(권한이 추가된 경우).
 - "관리자 승인 필요" 화면 → 학교 테넌트 정책입니다. `docs/admin-consent-request.md`를 참고해 정보통신처에 요청합니다.
 - 서버 로그: `data/logs/server.log`, `data/logs/mail_agent.log`
+- **활동 로그**: `data/logs/activity.jsonl`에 화면 클릭, API 호출(상태·시간), 계정 연결, 설정 저장, 실행 결과, 오류가 한 줄씩 남습니다(비밀번호·키·메일 본문은 기록하지 않음). 문제를 진단할 때 먼저 이 파일의 마지막 부분을 읽으세요.
+- Gmail·네이버는 설정 마법사 1단계의 'Gmail · 네이버 · 다음' 탭에서 앱 비밀번호로 연결합니다(비밀번호는 Windows 자격 증명 관리자에 저장).
 - 테스트: `.venv\Scripts\python -m pytest` (오프라인, Claude·Microsoft 호출 없음)
 
 ## 지켜야 할 것

@@ -26,9 +26,22 @@ async function refreshHealth() {
     ul.innerHTML = h.checks.map((c) => `
       <li class="h-${c.status}"><span class="h-icon">${ICON[c.status]}</span>
         <div><strong>${esc(c.label)}</strong><div class="muted">${esc(c.detail)}</div>
+          ${c.action && c.action.type === "reconnect" ? `<button class="small h-fix" data-reconnect="${esc(c.action.account)}">다시 연결</button>` : ""}
           ${c.links.length ? `<div class="h-links">${c.links.map((l) => l.url
             ? `<a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.when)} ${esc(l.title)} ↗</a>`
             : `<span>${esc(l.when)} ${esc(l.title)}</span>`).join("")}</div>` : ""}</div></li>`).join("");
+    ul.querySelectorAll("[data-reconnect]").forEach((b) => b.addEventListener("click", async () => {
+      const acct = b.dataset.reconnect;
+      ul.querySelectorAll("[data-reconnect]").forEach((x) => (x.disabled = true));
+      const note = document.createElement("div");
+      note.className = "muted";
+      b.after(note);
+      try {
+        await connectAccount(acct, (t) => { note.innerHTML = t; });
+        note.textContent = "연결되었습니다. 다시 확인하는 중…";
+        refreshAccounts(); refreshHealth();
+      } catch (err) { note.textContent = `연결하지 못했습니다: ${err.message}`; b.disabled = false; }
+    }));
   } catch (e) {
     ul.innerHTML = `<li class="h-fail"><span class="h-icon">❌</span><div><strong>서버 연결</strong><div class="muted">메일 비서 서버에 연결할 수 없습니다.</div></div></li>`;
   } finally { $("recheck").disabled = false; }
@@ -103,9 +116,10 @@ async function refreshAccounts() {
     ul.replaceChildren();
     if (!r.configured) ul.innerHTML = "<li class='muted'>앱 등록 정보(MS_CLIENT_ID)가 없습니다.</li>";
     else if (!r.accounts.length) ul.innerHTML = "<li class='warn'>연결된 계정이 없습니다. '+ 계정 추가'를 눌러 연결하세요.</li>";
-    r.accounts.forEach((a) => {
+    (r.details || r.accounts.map((u) => ({ username: u, label: "" }))).forEach((d) => {
+      const a = d.username;
       const li = document.createElement("li");
-      li.innerHTML = `<span><span class="ok">●</span> ${esc(a)}</span>`;
+      li.innerHTML = `<span><span class="ok">●</span> ${esc(a)} <span class="muted">${esc(d.label || "")}</span></span>`;
       const rm = Object.assign(document.createElement("button"), { textContent: "연결 해제", className: "link" });
       rm.addEventListener("click", async () => {
         if (!confirm(`${a} 연결을 해제할까요?`)) return;

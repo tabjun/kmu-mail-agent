@@ -37,5 +37,8 @@ def execute_action(action: dict, store: Store, mail_actions, only_ids: set[str] 
             log.warning("move failed for %s: %s", item["message_id"], e)
             failed.append({"message_id": item["message_id"], "error": str(e)[:200]})
     result = {"moved": len(moved), "failed": failed, "skipped": len(skipped)}
+    from .activity import log_event
+
+    log_event("cleanup_executed", action_id=action["id"], moved=len(moved), failed=len(failed), skipped=len(skipped))
     store.set_action_status(action["id"], "done" if not failed else "failed", result)
     return result

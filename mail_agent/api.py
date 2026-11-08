@@ -99,6 +99,12 @@ class ApproveRequest(BaseModel):
     message_ids: Optional[list[str]] = None  # subset; None = all items in the proposal
 
 
+class ImapRequest(BaseModel):
+    username: str = Field(min_length=3, max_length=200)
+    password: str = Field(min_length=4, max_length=200)
+    host: Optional[str] = None
+
+
 class FeedbackRequest(BaseModel):
     priority: Priority
     note: Optional[str] = Field(None, max_length=300)
@@ -121,6 +127,31 @@ def create_app(settings: Settings | None = None, store: Store | None = None, llm
             return _llm["v"]
 
     app = FastAPI(title="KMU Mail Agent API", version="0.2.0")
+
+    from . import activity
+    from .activity import log_event
+
+    activity.init(s.data_dir / "logs")
+    log_event("server_start", auth_mode=s.api_auth_mode, monitor=start_monitor, mail_source=s.mail_source,
+              calendar=s.calendar_provider)
+
+    @app.middleware("http")
+    async def no_stale_ui(request: Request, call_next):
+        import time as _time
+
+        t0 = _time.perf_counter()
+        try:
+            response = await call_next(request)
+        except Exception as e:
+            log_event("api_error", method=request.method, path=request.url.path, error=f"{type(e).__name__}: {e}")
+            raise
+        path = request.url.path
+        if path.startswith("/api/") and path not in ("/api/log", "/api/status"):
+            log_event("api", method=request.method, path=path, status=response.status_code,
+                      ms=int((_time.perf_counter() - t0) * 1000))
+        if path == "/" or path in ("/setup", "/chat", "/guide") or path.startswith(("/web/", "/addin/")):
+            response.headers["Cache-Control"] = "no-cache"
+        return response
     app.add_middleware(
         CORSMiddleware, allow_origins=s.api_allowed_origins, allow_credentials=False,
         allow_methods=["GET", "POST"], allow_headers=["Authorization", "Content-Type", "X-API-Key"],
@@ -274,6 +305,17 @@ def create_app(settings: Settings | None = None, store: Store | None = None, llm
     def guide_page():
         return FileResponse(PROJECT_ROOT / "web" / "guide.html")
 
+    @app.post("/api/log")
+    def client_log(body: dict, user: dict = Depends(require_user)):
+        """Browser-side events (page views, clicks, JS errors). Only small, non-secret fields are kept."""
+        allowed = {k: body.get(k) for k in ("type", "page", "target", "detail", "message", "source", "line")}
+        log_event("ui", **{k: v for k, v in allowed.items() if v is not None})
+        return {"ok": True}
+
+    @app.get("/api/activity")
+    def recent_activity(n: int = 200, user: dict = Depends(require_user)):
+        return activity.tail(min(n, 2000))
+
     @app.get("/api/models")
     def models(user: dict = Depends(require_user)):
         return {"choices": MODEL_CHOICES, "default_chat": prefs_store.load().chat_model}
@@ -285,8 +327,11 @@ def create_app(settings: Settings | None = None, store: Store | None = None, llm
     @app.put("/api/preferences")
     def put_prefs(patch: dict, user: dict = Depends(require_user)):
         try:
-            return prefs_store.update(patch)
+            out = prefs_store.update(patch)
+            log_event("prefs_saved", keys=sorted(patch.keys()), source="web")
+            return out
         except Exception as e:
+            log_event("prefs_save_failed", keys=sorted(patch.keys()), error=str(e)[:300])
             raise HTTPException(400, str(e)) from e
 
     @app.post("/api/chat")
@@ -294,7 +339,14 @@ def create_app(settings: Settings | None = None, store: Store | None = None, llm
         try:
             if req.agent and req.agent not in AGENTS:
                 raise HTTPException(400, "unknown agent")
-            return assistant.chat(req.session_id, req.message, req.model, req.agent)
+            import time as _t
+
+            t0 = _t.perf_counter()
+            out = assistant.chat(req.session_id, req.message, req.model, req.agent)
+            log_event("chat", agent=req.agent, model=out.get("model"), user_text=req.message[:200],
+                      reply_chars=len(out.get("reply") or ""), cards=[a.get("type") for a in out.get("attachments", [])],
+                      prefs_changed=out.get("preferences_changed"), ms=int((_t.perf_counter() - t0) * 1000))
+            return out
         except Exception as e:
             log.exception("chat failed")
             raise HTTPException(502, f"chat failed: {type(e).__name__}: {e}"[:300]) from e
@@ -340,11 +392,63 @@ def create_app(settings: Settings | None = None, store: Store | None = None, llm
 
     @app.get("/api/accounts")
     def accounts(user: dict = Depends(require_user)):
-        if not s.ms_client_id:
-            return {"accounts": [], "configured": False}
+        from .imap_mail import ImapAccountStore
+
+        details = []
+        if s.ms_client_id:
+            from .msgraph import GraphAuth
+
+            details += [{"username": u, "type": "microsoft", "label": "Microsoft · 메일+캘린더"}
+                        for u in GraphAuth(s).accounts()]
+        details += [{"username": a["username"], "type": "imap", "label": f"메일 (IMAP · {a['host']})"}
+                    for a in ImapAccountStore(s).list()]
+        return {"accounts": [d["username"] for d in details], "details": details, "configured": bool(s.ms_client_id)}
+
+    @app.post("/api/accounts/imap")
+    def add_imap(req: ImapRequest, user: dict = Depends(require_user)):
+        """Gmail / Naver / Daum etc. with an app password (stored in the OS credential store)."""
+        from .imap_mail import ImapAccountStore
+
+        try:
+            info = ImapAccountStore(s).add(req.username.strip(), req.password.replace(" ", ""), req.host or None)
+        except Exception as e:
+            log_event("imap_add_failed", username=req.username.strip(), error=str(e)[:300])
+            raise HTTPException(400, str(e)[:300]) from e
+        log_event("imap_add_done", username=info["username"], host=info["host"], total=info.get("total"))
+        return {"ok": True, "username": info["username"], "host": info["host"], "total": info.get("total")}
+
+    @app.get("/api/accounts/imap-help")
+    def imap_help(username: str, user: dict = Depends(require_user)):
+        from .imap_mail import APP_PASSWORD_HELP, guess_host
+
+        host = guess_host(username)
+        return {"host": host, "help": APP_PASSWORD_HELP.get(host or "", "메일 서비스의 IMAP 설정과 앱 비밀번호를 확인하세요.")}
+
+    @app.post("/api/accounts/login")
+    def browser_login(body: dict | None = None, user: dict = Depends(require_user)):
+        """One-click login: the Microsoft sign-in page opens in this PC's browser; the app finishes the connection."""
         from .msgraph import GraphAuth
 
-        return {"accounts": GraphAuth(s).accounts(), "configured": True}
+        import uuid as _uuid
+
+        expected = ((body or {}).get("expected") or "").strip()
+        login_id = _uuid.uuid4().hex[:10]
+        device_logins[login_id] = {"status": "waiting", "mode": "browser"}
+
+        def run():
+            log_event("account_login_start", mode="browser", expected=expected)
+            try:
+                username = GraphAuth(s).login_interactive(login_hint=expected or None)
+                device_logins[login_id].update(status="done", username=username,
+                                               mismatch=bool(expected) and username.lower() != expected.lower())
+                log_event("account_login_done", mode="browser", username=username,
+                          mismatch=device_logins[login_id]["mismatch"])
+            except Exception as e:
+                device_logins[login_id].update(status="failed", error=str(e)[:300])
+                log_event("account_login_failed", mode="browser", expected=expected, error=str(e)[:300])
+
+        threading.Thread(target=run, daemon=True).start()
+        return {"login_id": login_id, **device_logins[login_id]}
 
     @app.post("/api/accounts/device-login")
     def device_login(body: dict | None = None, user: dict = Depends(require_user)):
@@ -381,9 +485,14 @@ def create_app(settings: Settings | None = None, store: Store | None = None, llm
 
     @app.post("/api/accounts/remove")
     def remove_account(body: dict, user: dict = Depends(require_user)):
+        from .imap_mail import ImapAccountStore
+
+        username = body.get("username", "")
+        if ImapAccountStore(s).remove(username):
+            return {"removed": True}
         from .msgraph import GraphAuth
 
-        return {"removed": GraphAuth(s).remove_account(body.get("username", ""))}
+        return {"removed": GraphAuth(s).remove_account(username)}
 
     run_state: dict = {"running": False, "last": None}
 
@@ -394,10 +503,16 @@ def create_app(settings: Settings | None = None, store: Store | None = None, llm
 
         def job():
             run_state["running"] = True
+            log_event("run_start", trigger="manual")
             try:
                 st = fresh_settings()
                 st.apply_preferences()
                 out = run_pipeline(st)
+                log_event("run_done", trigger="manual", new=len(out.get("triaged", [])),
+                          calendar_created=len(out.get("calendar_created", [])),
+                          needs_review=len(out.get("needs_review", [])),
+                          cleanup=(out.get("cleanup") or {}).get("count"),
+                          checklist=(out.get("checklist") or {}).get("title"), errors=out.get("errors", []))
                 run_state["last"] = {"ok": True, "at": datetime.now(st.timezone).isoformat(timespec="minutes"),
                                      "new": len(out.get("triaged", [])),
                                      "calendar_created": len(out.get("calendar_created", [])),
@@ -405,6 +520,7 @@ def create_app(settings: Settings | None = None, store: Store | None = None, llm
                                      "errors": out.get("errors", []), "digest": out.get("digest_text", "")}
             except Exception as e:
                 run_state["last"] = {"ok": False, "error": str(e)[:500]}
+                log_event("run_failed", trigger="manual", error=f"{type(e).__name__}: {str(e)[:400]}")
             finally:
                 run_state["running"] = False
 
@@ -420,9 +536,9 @@ def create_app(settings: Settings | None = None, store: Store | None = None, llm
         prefs = st.apply_preferences()
         checks: list[dict] = []
 
-        def add(key, label, ok, detail, level=None, links=None):
+        def add(key, label, ok, detail, level=None, links=None, action=None):
             checks.append({"key": key, "label": label, "status": level or ("ok" if ok else "fail"),
-                           "detail": detail, "links": links or []})
+                           "detail": detail, "links": links or [], "action": action})
 
         # 1) background service
         auto = start_monitor and prefs.monitor.enabled and prefs.setup_completed
@@ -440,9 +556,16 @@ def create_app(settings: Settings | None = None, store: Store | None = None, llm
         # 3) + 4) Outlook mail / calendar per account
         rt = graph_runtime(st, store)
         if st.mail_source == "sample":
-            add("mail", "Outlook 메일 연결", False, "데모 모드(샘플 메일)로 실행 중입니다", "warn")
-        elif not rt.mail_clients:
-            add("mail", "Outlook 메일 연결", False, "연결된 계정이 없습니다 → '+ 계정 추가'")
+            add("mail", "메일 연결", False, "데모 모드(샘플 메일)로 실행 중입니다", "warn")
+        elif not rt.mail_clients and not rt.imap_clients:
+            add("mail", "메일 연결", False, "연결된 메일 계정이 없습니다 → '+ 계정 추가'")
+        for ic in (rt.imap_clients or []) if st.mail_source != "sample" else []:
+            try:
+                info = ic.check()
+                add("mail", "메일 연결 (IMAP)", True,
+                    f"{ic.username} · 받은편지함 {info['total']}통 (안 읽음 {info['unread']})")
+            except Exception as e:
+                add("mail", "메일 연결 (IMAP)", False, f"{ic.username} · {str(e)[:120]}")
         for c in rt.mail_clients if st.mail_source != "sample" else []:
             try:
                 inbox = c.get("/me/mailFolders/inbox", params={"$select": "totalItemCount,unreadItemCount"})
@@ -450,8 +573,8 @@ def create_app(settings: Settings | None = None, store: Store | None = None, llm
                     f"{c.username} · 받은편지함 {inbox.get('totalItemCount', 0)}통 (안 읽음 {inbox.get('unreadItemCount', 0)})")
             except Exception as e:
                 log.warning("mail health failed for %s: %s", c.username, e)
-                add("mail", "Outlook 메일 연결", False,
-                    f"{c.username} · 다시 로그인이 필요합니다 → '+ 계정 추가'에서 같은 계정을 다시 연결하세요")
+                add("mail", "Outlook 메일 연결", False, f"{c.username} · 연결이 끊겼습니다. '다시 연결'을 눌러 주세요",
+                    action={"type": "reconnect", "account": c.username})
 
         if st.calendar_provider != "outlook":
             add("calendar", "Outlook 캘린더 연결", False,
@@ -475,11 +598,13 @@ def create_app(settings: Settings | None = None, store: Store | None = None, llm
                     if cal.get("canEdit") else f"{c.username} · 캘린더에 쓸 권한이 없습니다", links=links)
             except Exception as e:
                 log.warning("calendar health failed for %s: %s", c.username, e)
-                add("calendar", "Outlook 캘린더 연결", False,
-                    f"{c.username} · 다시 로그인이 필요합니다 → '+ 계정 추가'에서 같은 계정을 다시 연결하세요")
+                add("calendar", "Outlook 캘린더 연결", False, f"{c.username} · 연결이 끊겼습니다. '다시 연결'을 눌러 주세요",
+                    action={"type": "reconnect", "account": c.username})
 
         order = {"fail": 2, "warn": 1, "ok": 0}
         worst = max((order[c["status"]] for c in checks), default=0)
+        log_event("health", overall=["ok", "warn", "fail"][worst],
+                  checks=[f"{c['label']}={c['status']}" for c in checks])
         return {"overall": ["ok", "warn", "fail"][worst], "checks": checks,
                 "checked_at": datetime.now(st.timezone).isoformat(timespec="minutes")}
 

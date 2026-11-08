@@ -164,3 +164,31 @@ def test_daily_checklist_event(settings):
     assert spec.start > late and spec.start.minute % 5 == 0 and spec.reminder_minutes == 0
     # same day + same calendar → same key, so the event is updated instead of duplicated
     assert spec.key == build_checklist_spec(items, NOW, settings, "me").key
+
+
+def test_outlook_duplicate_transaction_id_updates_existing(settings):
+    from mail_agent.calendars import EventSpec, OutlookCalendar
+
+    class Resp:
+        text = '{"error":{"code":"ErrorDuplicateTransactionId"}}'
+
+    class Err(Exception):
+        response = Resp()
+
+    class FakeGraph:
+        def __init__(self):
+            self.patched = []
+
+        def post(self, path, json):
+            raise Err()
+
+        def get(self, path, params=None, headers=None):
+            return {"value": [{"id": "other", "transactionId": "zzz"}, {"id": "E1", "transactionId": "k1"}]}
+
+        def patch(self, path, json):
+            self.patched.append(path)
+
+    g = FakeGraph()
+    cal = OutlookCalendar(g, settings)
+    spec = EventSpec("k1", "m", "✅ 오늘 할 일", "checklist", NOW, NOW, False, None, "body", 0)
+    assert cal.create(spec) == "E1" and g.patched == ["/me/events/E1"]

@@ -1,4 +1,4 @@
-# 매일 아침 메일 브리핑을 Windows 작업 스케줄러에 등록합니다.
+﻿# 매일 아침 메일 브리핑을 Windows 작업 스케줄러에 등록합니다.
 # 사용: PowerShell에서  .\scripts\register_daily_task.ps1 -Time "07:30"
 # 해제: Unregister-ScheduledTask -TaskName "KMU Mail Agent" -Confirm:$false
 param(

@@ -239,3 +239,13 @@ details > summary { cursor: pointer; color: var(--accent); margin-top: 10px; fon
 #last-check { margin: -4px 0 4px; }
 .model-row { display: flex; align-items: center; gap: 10px; margin-top: 14px; font-weight: 600; font-size: 14px; }
 .model-row select { flex: 1; max-width: 280px; }
+.h-fix { margin-top: 6px; }
+
+.acct-tabs { display: flex; gap: 8px; margin: 10px 0 6px; flex-wrap: wrap; }
+.acct-tab { background: transparent; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; }
+.acct-tab.active { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); font-weight: 600; }
+.imap-form { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; margin: 12px 0 6px; }
+.imap-form input { font-size: 15px; padding: 10px 12px; }
+.small-help { font-size: 12px; }
+#account-list li { gap: 10px; }
+@media (max-width: 900px) { .imap-form { grid-template-columns: 1fr; } }
