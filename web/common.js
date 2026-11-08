@@ -141,7 +141,8 @@ function alarmHelpHtml(r) {
       '🔔 메일 비서 테스트 알림'이 보이면 메일 비서 쪽은 정상입니다.</li>
     <li>휴대폰에 <b>Microsoft Outlook</b> 앱을 설치합니다. 아이폰은 App Store, 갤럭시는 Play 스토어에서 "Microsoft Outlook"을 검색하세요
       (파란 바탕에 흰 O 아이콘, 제작사 Microsoft Corporation).</li>
-    <li>앱에서 <b>${acct}</b>(으)로 로그인합니다.${nonMsDomain ? `
+    <li>앱의 계정 목록에 <b>${acct}</b>${r.display_name ? ` (${esc(r.display_name)})` : ""}가 <b>Microsoft 계정</b>으로 있어야 합니다.
+      같은 주소가 Google 'G' 아이콘으로 붙어 있다면 그건 Gmail 연결이라 이 캘린더 알림은 오지 않습니다.${nonMsDomain ? `
       <br><span class="warn">⚠ 이 주소는 Gmail 등 다른 회사 주소로 만든 <b>Microsoft 계정</b>입니다. 주소를 넣었을 때 Google 로그인 화면이 나오면
       Gmail 쪽으로 연결되는 것이니, 그 화면에서 계정 종류(공급자)를 바꾸는 메뉴를 눌러 <b>Outlook.com / Microsoft</b>를 고르세요.</span>` : ""}</li>
     <li>Outlook 앱 <b>설정 → 알림 → 캘린더</b>에서 알림을 켜고, 휴대폰 설정에서도 Outlook 앱 알림을 허용합니다.
@@ -159,8 +160,12 @@ function bindTestAlarm(btnId = "test-alarm", msgId = "test-alarm-msg") {
     msg.textContent = "Outlook 캘린더에 넣는 중…";
     try {
       const r = await api("/api/calendar/test-alarm", { method: "POST" });
-      msg.innerHTML = `✅ <b>${esc(r.at)}</b>에 울리는 '🔔 테스트 알림'을 ${esc(r.account)} 캘린더에 넣었습니다.
-        PC와 휴대폰 <b>Microsoft Outlook</b> 앱에서 울리는지 확인하세요.${alarmHelpHtml(r)}`;
+      const who = r.display_name ? `${esc(r.display_name)} (${esc(r.account)})` : esc(r.account);
+      msg.innerHTML = `✅ <b>${esc(r.when || r.at)}</b>에 울리는 '🔔 메일 비서 테스트 알림'을 넣었습니다.
+        <br>계정 <b>${who}</b> · 캘린더 <b>${esc(r.calendar_name || "기본 캘린더")}</b>
+        ${r.web_link ? ` · <a href="${esc(r.web_link)}" target="_blank" rel="noopener">Outlook에서 이 일정 열기 ↗</a>` : ""}
+        <br>PC와 휴대폰 <b>Microsoft Outlook</b> 앱에서 울리는지 확인하세요.
+        Outlook 화면이 '작업 주(월~금)'로 되어 있으면 주말 일정은 보이지 않으니 '일' 또는 '주' 보기로 확인하세요.${alarmHelpHtml(r)}`;
     } catch (e) { msg.textContent = e.message.replace(/^\d+ /, ""); }
     finally { btn.disabled = false; }
   });

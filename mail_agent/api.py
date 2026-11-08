@@ -544,9 +544,20 @@ def create_app(settings: Settings | None = None, store: Store | None = None, llm
             log_event("test_alarm_failed", error=str(e)[:300])
             raise HTTPException(502, f"테스트 알림을 넣지 못했습니다: {str(e)[:200]}") from e
         log_event("test_alarm", account=rt.calendar_client.username, at=spec.start.isoformat(timespec="minutes"))
-        personal = rt.calendar_client.auth.is_personal(rt.calendar_client.username)
-        return {"ok": True, "account": rt.calendar_client.username, "at": spec.start.strftime("%H:%M"), "event_id": event_id,
-                "personal": personal,
+        c = rt.calendar_client
+        personal = c.auth.is_personal(c.username)
+        info = {"web_link": None, "calendar_name": None, "display_name": None}
+        try:  # where exactly it went, so the user can find it (best effort)
+            if event_id:
+                info["web_link"] = c.get(f"/me/events/{event_id}", params={"$select": "webLink"}).get("webLink")
+            info["calendar_name"] = c.get("/me/calendar", params={"$select": "name"}).get("name")
+            info["display_name"] = c.get("/me", params={"$select": "displayName"}).get("displayName")
+        except Exception:
+            pass
+        wd = "월화수목금토일"[spec.start.weekday()]
+        return {"ok": True, "account": c.username, "at": spec.start.strftime("%H:%M"),
+                "when": f"{spec.start.month}월 {spec.start.day}일({wd}) {spec.start:%H:%M}", "event_id": event_id,
+                "personal": personal, **info,
                 "web_url": "https://outlook.live.com/calendar/" if personal else "https://outlook.office.com/calendar/"}
 
     @app.get("/api/health/full")
