@@ -28,6 +28,34 @@ async function loadAccounts() {
   accountDetails.forEach((a) => ul.insertAdjacentHTML("beforeend",
     `<li><span>✅ ${esc(a.username)}</span><span class="muted">${esc(a.label)}</span></li>`));
   $("to-2").disabled = !accounts.length;
+  renderGoogleCalendar(r.google_configured);
+}
+
+// Gmail → the same Gmail's Google Calendar
+function renderGoogleCalendar(configured) {
+  const box = $("gcal-box");
+  const gmails = accountDetails.filter((a) => a.type === "imap" && /gmail\.com/.test(a.label + a.username)).map((a) => a.username);
+  const linked = new Set(accountDetails.filter((a) => a.type === "google_calendar").map((a) => a.username.toLowerCase()));
+  if (!gmails.length) { box.hidden = true; return; }
+  box.hidden = false;
+  box.innerHTML = `<strong>📅 Gmail 메일의 일정은 같은 Gmail의 Google 캘린더로</strong>
+    <p class="muted">연결하면 이 Gmail에서 찾은 회의·마감이 Google 캘린더에 들어가, 휴대폰 Google 캘린더와 Outlook에 추가해 둔 Gmail 캘린더에 바로 보입니다.</p>` +
+    gmails.map((g) => linked.has(g.toLowerCase())
+      ? `<div class="row tight">✅ <b>${esc(g)}</b> Google 캘린더 연결됨</div>`
+      : configured
+        ? `<div class="row tight"><button type="button" class="small" data-gcal="${esc(g)}">${esc(g)} Google 캘린더 연결</button></div>`
+        : `<div class="row tight warn">${esc(g)}: Google 캘린더 연결 정보가 키 파일(.env)에 없습니다. 연구실에 새 키 파일을 요청하세요.</div>`).join("") +
+    `<div id="gcal-msg" class="muted"></div>`;
+  box.querySelectorAll("[data-gcal]").forEach((b) => b.addEventListener("click", async () => {
+    const msg = $("gcal-msg");
+    b.disabled = true;
+    msg.textContent = "브라우저에 Google 로그인 창이 열립니다. 계정을 고르고 '허용'(또는 '계속')을 눌러 주세요…";
+    try {
+      const r = await api("/api/accounts/google-calendar", { method: "POST", body: JSON.stringify({ expected: b.dataset.gcal }) });
+      msg.innerHTML = r.mismatch ? `⚠ 다른 계정 <b>${esc(r.username)}</b>으로 연결됐습니다.` : `✅ ${esc(r.username)} Google 캘린더 연결 완료`;
+      loadAccounts();
+    } catch (e) { msg.textContent = e.message.replace(/^\d+ /, ""); b.disabled = false; }
+  }));
 }
 
 async function connect(e) {
@@ -133,8 +161,11 @@ async function fillForm() {
   const cal = $("f-calendar");
   cal.replaceChildren();
   const msAccounts = accountDetails.filter((a) => a.type === "microsoft").map((a) => a.username);
-  if (!msAccounts.length) cal.append(new Option("Microsoft 계정을 연결하면 Outlook 캘린더를 고를 수 있습니다", ""));
-  msAccounts.forEach((a) => cal.append(new Option(`${a}의 Outlook 캘린더`, a, false, a === p.calendar_account)));
+  const gAccounts = accountDetails.filter((a) => a.type === "google_calendar").map((a) => a.username);
+  const chosen = p.calendar_account || (gAccounts.length ? `google:${gAccounts[0]}` : msAccounts[0] || "");
+  if (!msAccounts.length && !gAccounts.length) cal.append(new Option("Microsoft 계정이나 Google 캘린더를 연결하면 고를 수 있습니다", ""));
+  gAccounts.forEach((a) => cal.append(new Option(`${a}의 Google 캘린더`, `google:${a}`, false, `google:${a}` === chosen)));
+  msAccounts.forEach((a) => cal.append(new Option(`${a}의 Outlook 캘린더`, a, false, a === chosen)));
 }
 
 function formPatch() {

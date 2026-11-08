@@ -34,6 +34,8 @@ class EventSpec:
     location: str | None
     body: str
     reminder_minutes: int
+    account: str | None = None        # mailbox the mail came from → calendar of that same account
+    reminders: tuple[int, ...] = ()   # every alarm offset (Google keeps them all on one event)
 
 
 def event_key(message_id: str, ev: ExtractedEvent) -> str:
@@ -65,7 +67,9 @@ def build_spec(email: Email, ev: ExtractedEvent, settings: Settings) -> EventSpe
         f"근거: \"{ev.evidence}\"\n" + (f"Outlook에서 열기: {email.web_link}\n" if email.web_link else "")
         + "\n(KMU Mail Agent가 메일에서 자동 추출한 일정입니다. 원문을 확인하세요.)"
     )
-    return EventSpec(event_key(email.id, ev), email.id, title, ev.kind, start, end, all_day, ev.location, body, reminder)
+    offsets = {"deadline": settings.deadline_reminders, "meeting": settings.meeting_reminders}.get(ev.kind) or [reminder]
+    return EventSpec(event_key(email.id, ev), email.id, title, ev.kind, start, end, all_day, ev.location, body, reminder,
+                     email.account, tuple(sorted(set(offsets), reverse=True)))
 
 
 def build_precheck_specs(email: Email, ev: ExtractedEvent, settings: Settings, now: datetime) -> list[EventSpec]:
@@ -120,7 +124,7 @@ def build_extra_reminder_specs(email: Email, ev: ExtractedEvent, settings: Setti
         what = "마감" if ev.kind == "deadline" else "시작"
         body = f"{_fmt_short(anchor, settings.timezone)} {what}: {base}\n\n{main.body}"
         specs.append(EventSpec(key, email.id, f"[미리 알림 · {_offset_label(off)}] {base}", "reminder",
-                               start, start + timedelta(minutes=5), False, None, body, 0))
+                               start, start + timedelta(minutes=5), False, None, body, 0, email.account))
     return specs
 
 
@@ -194,6 +198,7 @@ class OutlookCalendar:
 
     def __init__(self, client, settings: Settings):
         self.client = client
+        self.username = getattr(client, "username", None)
         self.tzname = self._WINDOWS_TZ.get(settings.timezone.key, "UTC")
         self.tz = settings.timezone if self.tzname != "UTC" else timezone.utc
 
@@ -247,58 +252,6 @@ class OutlookCalendar:
             "isReminderOn": True,
             "reminderMinutesBeforeStart": spec.reminder_minutes,
         })
-        return event_id
-
-
-class GoogleCalendar:
-    name = "google"
-    TOKEN_SCOPES = ["https://www.googleapis.com/auth/calendar.events"]
-
-    def __init__(self, settings: Settings):
-        try:
-            from google.auth.transport.requests import Request
-            from google.oauth2.credentials import Credentials
-            from google_auth_oauthlib.flow import InstalledAppFlow
-            from googleapiclient.discovery import build
-        except ImportError as e:  # optional dependency
-            raise RuntimeError("pip install google-api-python-client google-auth-oauthlib 후 사용하세요.") from e
-        token_path: Path = settings.data_dir / "google_token.json"
-        creds = Credentials.from_authorized_user_file(str(token_path), self.TOKEN_SCOPES) if token_path.exists() else None
-        if not creds or not creds.valid:
-            if creds and creds.expired and creds.refresh_token:
-                creds.refresh(Request())
-            else:
-                flow = InstalledAppFlow.from_client_secrets_file(str(settings.google_credentials_file), self.TOKEN_SCOPES)
-                creds = flow.run_local_server(port=0)
-            token_path.write_text(creds.to_json(), encoding="utf-8")
-        self.service = build("calendar", "v3", credentials=creds, cache_discovery=False)
-        self.calendar_id = settings.google_calendar_id
-        self.tz = settings.timezone
-
-    def create(self, spec: EventSpec) -> str | None:
-        # Google event ids: base32hex chars (a-v, 0-9), 5-1024 long.
-        gid = base64.b32hexencode(bytes.fromhex(spec.key)).decode().lower().rstrip("=")
-        when = (lambda d: {"date": d.strftime("%Y-%m-%d")}) if spec.all_day else \
-               (lambda d: {"dateTime": d.isoformat(), "timeZone": self.tz.key})
-        body = {
-            "id": gid, "summary": spec.title, "description": spec.body,
-            "start": when(spec.start), "end": when(spec.end),
-            "reminders": {"useDefault": False, "overrides": [{"method": "popup", "minutes": spec.reminder_minutes}]},
-        }
-        if spec.location:
-            body["location"] = spec.location
-        try:
-            return self.service.events().insert(calendarId=self.calendar_id, body=body).execute().get("id")
-        except Exception as e:  # 409 = already created on an earlier run
-            if "409" in str(e):
-                return gid
-            raise
-
-
-    def update(self, spec: EventSpec, event_id: str) -> str | None:
-        when = (lambda d: {"date": d.strftime("%Y-%m-%d")}) if spec.all_day else                (lambda d: {"dateTime": d.isoformat(), "timeZone": self.tz.key})
-        body = {"summary": spec.title, "description": spec.body, "start": when(spec.start), "end": when(spec.end)}
-        self.service.events().patch(calendarId=self.calendar_id, eventId=event_id, body=body).execute()
         return event_id
 
 
@@ -363,6 +316,41 @@ def build_checklist_spec(items: list[TriagedEmail], now: datetime, settings: Set
                      start=start, end=end, all_day=False, location=None, body="\n".join(lines), reminder_minutes=0)
 
 
+def route_key(message_id: str | None, account: str | None) -> tuple[str, str]:
+    """('imap'|'graph', account). The same address can be both a Gmail (IMAP) mailbox and a
+    Microsoft account, so the mailbox kind is part of the key."""
+    return ("imap" if (message_id or "").startswith("imap:") else "graph", (account or "").lower())
+
+
+class RoutingCalendar:
+    """Puts each event in the calendar of the account its mail came from:
+    Office 365 / Outlook mail → that account's Outlook calendar, Gmail → that Gmail's Google Calendar
+    (when connected). Anything else — and the daily checklist — goes to the main calendar."""
+    name = "routed"
+
+    def __init__(self, default, by_account: dict | None = None):
+        self.default = default
+        self.by_account = by_account or {}
+        self.username = getattr(default, "username", None)
+
+    def pick(self, spec: EventSpec):
+        return self.by_account.get(route_key(spec.message_id, spec.account)) or self.default
+
+    def create(self, spec: EventSpec) -> str | None:
+        sink = self.pick(spec)
+        if sink is None:
+            raise RuntimeError("일정을 넣을 캘린더가 없습니다. 계정을 연결하세요.")
+        if spec.kind == "reminder" and sink.name == "google":
+            return "merged-into-event"  # Google holds every alarm on the event itself
+        return sink.create(spec)
+
+    def update(self, spec: EventSpec, event_id: str) -> str | None:
+        sink = self.pick(spec)
+        if sink is None or (spec.kind == "reminder" and sink.name == "google"):
+            return event_id
+        return sink.update(spec, event_id)
+
+
 def make_calendar(settings: Settings, graph_client=None) -> CalendarSink | None:
     p = settings.calendar_provider.lower()
     if p == "none":
@@ -371,6 +359,11 @@ def make_calendar(settings: Settings, graph_client=None) -> CalendarSink | None:
         if graph_client is None:
             raise RuntimeError("CALENDAR_PROVIDER=outlook에는 Microsoft 로그인이 필요합니다.")
         return OutlookCalendar(graph_client, settings)
-    if p == "google":
-        return GoogleCalendar(settings)
+    if p == "google":  # legacy CLI switch: the first connected Google account
+        from .google_cal import GoogleAuth, GoogleCalendar
+
+        accts = GoogleAuth(settings).accounts()
+        if not accts:
+            raise RuntimeError("연결된 Google 캘린더가 없습니다.")
+        return GoogleCalendar(settings, accts[0])
     return IcsCalendar(settings)

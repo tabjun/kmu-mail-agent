@@ -26,6 +26,8 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from .calendars import build_spec
+from pathlib import Path
+
 from .config import PROJECT_ROOT, Settings
 from .graph import build_rules_text
 from .llm import ClaudeLLM, RuleBasedLLM
@@ -289,6 +291,59 @@ def create_app(settings: Settings | None = None, store: Store | None = None, llm
     prefs_store = PreferencesStore(s.prefs_path)
     device_logins: dict[str, dict] = {}
 
+    ENV_ATTRS = ("anthropic_api_key", "anthropic_workspace_id", "ms_client_id", "ms_tenant",
+                 "google_client_id", "google_client_secret")
+
+    def _adopt_key_file() -> str | None:
+        """The key file often lands one step off: inside a 'kmu-mail-agent-key' subfolder (Windows' default when
+        extracting), as '.env.txt', or still zipped in this folder / Downloads. Put it where it belongs."""
+        import shutil
+        import zipfile
+
+        env_path = PROJECT_ROOT / ".env"
+        if env_path.exists():
+            return None
+        sub = PROJECT_ROOT / "kmu-mail-agent-key" / ".env"
+        if sub.exists():
+            shutil.copyfile(sub, env_path)
+            return "kmu-mail-agent-key 폴더 안의 .env를 옮겨 적용했습니다."
+        txt = PROJECT_ROOT / ".env.txt"
+        if txt.exists() and "ROOT_API_KEY" in txt.read_text(encoding="utf-8", errors="ignore"):
+            txt.rename(env_path)
+            return "'.env.txt'로 저장된 파일을 '.env'로 바꿔 적용했습니다."
+        for z in (PROJECT_ROOT / "kmu-mail-agent-key.zip", Path.home() / "Downloads" / "kmu-mail-agent-key.zip"):
+            if z.exists():
+                with zipfile.ZipFile(z) as zf:
+                    name = next((n for n in zf.namelist() if n.endswith(".env")), None)
+                    if name:
+                        env_path.write_bytes(zf.read(name))
+                        return f"{z.name}에서 .env를 꺼내 적용했습니다."
+        return None
+
+    @app.get("/api/env-status")
+    def env_status(user: dict = Depends(require_user)):
+        """Where this PC's key file (.env) goes, and whether it is applied. Re-reads .env on every call,
+        so dropping the file in and pressing '다시 확인' works without restarting the service."""
+        import os
+
+        from dotenv import dotenv_values
+
+        fixed = _adopt_key_file()
+        env_path = PROJECT_ROOT / ".env"
+        if env_path.exists():
+            for k, v in dotenv_values(env_path).items():
+                if v:
+                    os.environ[k] = v
+            fresh = Settings()
+            for attr in ENV_ATTRS:
+                setattr(s, attr, getattr(fresh, attr))
+        status = {"folder": str(PROJECT_ROOT), "env_exists": env_path.exists(), "fixed": fixed,
+                  "has_key": bool(s.anthropic_api_key), "has_workspace": bool(s.anthropic_workspace_id),
+                  "has_google": bool(s.google_client_id and s.google_client_secret)}
+        if fixed:
+            log_event("env_adopted", detail=fixed)
+        return status
+
     @app.get("/", include_in_schema=False)
     def index():
         return FileResponse(PROJECT_ROOT / "web" / "index.html")
@@ -402,7 +457,34 @@ def create_app(settings: Settings | None = None, store: Store | None = None, llm
                         for u in GraphAuth(s).accounts()]
         details += [{"username": a["username"], "type": "imap", "label": f"메일 (IMAP · {a['host']})"}
                     for a in ImapAccountStore(s).list()]
-        return {"accounts": [d["username"] for d in details], "details": details, "configured": bool(s.ms_client_id)}
+        from .google_cal import GoogleAuth
+
+        gauth = GoogleAuth(s)
+        details += [{"username": u, "type": "google_calendar", "label": "Google 캘린더"} for u in gauth.accounts()]
+        return {"accounts": sorted({d["username"] for d in details}), "details": details,
+                "configured": bool(s.ms_client_id), "google_configured": gauth.configured()}
+
+    @app.post("/api/accounts/google-calendar")
+    def connect_google_calendar(body: dict | None = None, user: dict = Depends(require_user)):
+        """Gmail → Google Calendar: opens Google's consent page in this PC's browser and waits for it."""
+        from .google_cal import GoogleAuth
+
+        expected = ((body or {}).get("expected") or "").strip()
+        gauth = GoogleAuth(s)
+        if not gauth.configured():
+            raise HTTPException(400, "Google 캘린더 연결 정보가 .env에 없습니다(GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET). "
+                                     "연구실에서 받은 키 파일을 확인하세요.")
+        log_event("google_calendar_login_start", expected=expected)
+        try:
+            email = gauth.login_interactive(login_hint=expected or None)
+        except Exception as e:
+            log_event("google_calendar_login_failed", expected=expected, error=str(e)[:300])
+            raise HTTPException(400, f"Google 캘린더를 연결하지 못했습니다: {str(e)[:200]}") from e
+        p = prefs_store.load()
+        if p.calendar_account in (None, "", email):  # unset, or the Microsoft account with the same address
+            prefs_store.update({"calendar_account": f"google:{email}"})
+        log_event("google_calendar_login_done", username=email, mismatch=bool(expected) and email.lower() != expected.lower())
+        return {"ok": True, "username": email, "mismatch": bool(expected) and email.lower() != expected.lower()}
 
     @app.post("/api/accounts/imap")
     def add_imap(req: ImapRequest, user: dict = Depends(require_user)):
@@ -487,9 +569,19 @@ def create_app(settings: Settings | None = None, store: Store | None = None, llm
     def remove_account(body: dict, user: dict = Depends(require_user)):
         from .imap_mail import ImapAccountStore
 
-        username = body.get("username", "")
-        if ImapAccountStore(s).remove(username):
+        username, kind = body.get("username", ""), body.get("type")
+        log_event("account_remove", username=username, type=kind)
+        if kind == "google_calendar":
+            from .google_cal import GoogleAuth
+
+            removed = GoogleAuth(s).remove(username)
+            if prefs_store.load().calendar_account == f"google:{username}":
+                prefs_store.update({"calendar_account": None})
+            return {"removed": removed}
+        if kind in (None, "imap") and ImapAccountStore(s).remove(username):
             return {"removed": True}
+        if kind == "imap":
+            return {"removed": False}
         from .msgraph import GraphAuth
 
         return {"removed": GraphAuth(s).remove_account(username)}
@@ -535,9 +627,25 @@ def create_app(settings: Settings | None = None, store: Store | None = None, llm
         st = fresh_settings()
         st.apply_preferences()
         rt = graph_runtime(st, store)
-        if rt.calendar_client is None:
-            raise HTTPException(400, "일정을 넣을 Microsoft 계정이 없습니다. '+ 계정 추가'에서 Outlook 계정을 연결하세요.")
         spec = build_test_alarm_spec(st, datetime.now(st.timezone))
+        wd = "월화수목금토일"[spec.start.weekday()]
+        when = f"{spec.start.month}월 {spec.start.day}일({wd}) {spec.start:%H:%M}"
+        if (st.calendar_account or "").startswith("google:"):
+            from .google_cal import GoogleCalendar
+
+            gu = st.calendar_account[7:]
+            try:
+                gc = GoogleCalendar(st, gu)
+                event_id = gc.create(spec)
+            except Exception as e:
+                log_event("test_alarm_failed", error=str(e)[:300])
+                raise HTTPException(502, f"테스트 알림을 넣지 못했습니다: {str(e)[:200]}") from e
+            log_event("test_alarm", account=f"google:{gu}", at=spec.start.isoformat(timespec="minutes"))
+            return {"ok": True, "account": gu, "at": spec.start.strftime("%H:%M"), "when": when, "event_id": event_id,
+                    "provider": "google", "calendar_name": "Google 캘린더", "display_name": None,
+                    "web_link": gc.web_link(event_id), "personal": False, "web_url": "https://calendar.google.com/"}
+        if rt.calendar_client is None:
+            raise HTTPException(400, "일정을 넣을 계정이 없습니다. '+ 계정 추가'에서 Outlook 계정을 연결하거나 Gmail의 Google 캘린더를 연결하세요.")
         try:
             event_id = OutlookCalendar(rt.calendar_client, st).create(spec)
         except Exception as e:
@@ -554,9 +662,8 @@ def create_app(settings: Settings | None = None, store: Store | None = None, llm
             info["display_name"] = c.get("/me", params={"$select": "displayName"}).get("displayName")
         except Exception:
             pass
-        wd = "월화수목금토일"[spec.start.weekday()]
-        return {"ok": True, "account": c.username, "at": spec.start.strftime("%H:%M"),
-                "when": f"{spec.start.month}월 {spec.start.day}일({wd}) {spec.start:%H:%M}", "event_id": event_id,
+        return {"ok": True, "account": c.username, "at": spec.start.strftime("%H:%M"), "provider": "outlook",
+                "when": when, "event_id": event_id,
                 "personal": personal, **info,
                 "web_url": "https://outlook.live.com/calendar/" if personal else "https://outlook.office.com/calendar/"}
 
@@ -608,6 +715,26 @@ def create_app(settings: Settings | None = None, store: Store | None = None, llm
                 log.warning("mail health failed for %s: %s", c.username, e)
                 add("mail", "Outlook 메일 연결", False, f"{c.username} · 연결이 끊겼습니다. '다시 연결'을 눌러 주세요",
                     action={"type": "reconnect", "account": c.username})
+
+        from .google_cal import GoogleAuth, GoogleCalendar
+
+        gauth = GoogleAuth(st)
+        imap_names = {ic.username.lower() for ic in (rt.imap_clients or [])}
+        for gu in gauth.accounts():
+            try:
+                gc = GoogleCalendar(st, gu, gauth)
+                ev = gc.upcoming(datetime.now(st.timezone).isoformat())
+                links = [{"title": e.get("summary", ""), "when": (e["start"].get("dateTime") or e["start"].get("date", ""))[5:16].replace("T", " "),
+                          "url": e.get("htmlLink")} for e in ev[:3]]
+                mailbox = "이 Gmail 메일의 일정이 여기에 들어갑니다" if gu.lower() in imap_names else "메일 계정과 연결되지 않음(대표 캘린더로만 사용)"
+                add("calendar", "Google 캘린더 연결", True, f"{gu} · {mailbox} · 앞으로 등록된 일정 {len(ev)}건", links=links)
+            except Exception as e:
+                add("calendar", "Google 캘린더 연결", False, f"{gu} · 연결이 끊겼습니다. 설정 1단계에서 'Google 캘린더 연결'을 다시 눌러 주세요 ({str(e)[:80]})")
+        unmatched = sorted(u for u in imap_names if not gauth.has(u))
+        if unmatched:
+            add("calendar", "Gmail 일정 위치", False,
+                f"{', '.join(unmatched)} 메일의 일정은 대표 캘린더({st.calendar_account or (rt.calendar_client.username if rt.calendar_client else '없음')})에 들어갑니다. "
+                "같은 Gmail 캘린더에 넣으려면 설정 1단계에서 'Google 캘린더 연결'을 누르세요", "warn")
 
         if st.calendar_provider != "outlook":
             add("calendar", "Outlook 캘린더 연결", False,

@@ -48,13 +48,14 @@
       <div id="kind-imap" hidden>
         <p class="muted">Gmail·네이버·다음 메일은 <strong>앱 비밀번호</strong>로 연결합니다(일반 로그인 비밀번호는 쓰지 않습니다).
           비밀번호는 이 PC의 Windows 자격 증명 관리자에만 저장됩니다.
-          <br>할 일 알림은 Outlook 캘린더로 오므로, 캘린더용 Microsoft 계정도 하나 연결해 두세요.</p>
+          <br>연결한 뒤 아래 <b>Google 캘린더 연결</b>을 누르면, 이 Gmail에서 찾은 일정이 같은 Gmail의 Google 캘린더에 들어갑니다.</p>
         <form id="imap-form" class="imap-form">
           <input id="imap-email" type="email" placeholder="example@gmail.com" required autocomplete="email">
           <input id="imap-pass" type="password" placeholder="앱 비밀번호 (16자리)" required autocomplete="off">
           <button type="submit" id="imap-connect">연결하기</button>
         </form>
         <p id="imap-help" class="muted small-help"></p>
+        <div id="gcal-box" class="gcal-box" hidden></div>
       </div>
       <div id="device" class="device" hidden></div>
       <h3 class="small-title">연결된 계정</h3>
@@ -119,8 +120,10 @@
             </div>
             <small>피드백을 받을 시간이 있도록 마감 당일이 아니라 며칠 전에 알려 드립니다.</small>
           </div>
-          <label>일정을 넣을 캘린더
+          <label>대표 캘린더 ('오늘 할 일' 체크리스트가 들어갈 곳)
             <select id="f-calendar"></select>
+            <small>메일에서 찾은 일정은 <b>그 메일 계정의 캘린더</b>에 들어갑니다. 학교 Office 365 메일 → 같은 계정의 Outlook 캘린더,
+              Gmail → 연결한 같은 Gmail의 Google 캘린더. 캘린더가 연결되지 않은 메일의 일정만 대표 캘린더로 갑니다.</small>
           </label>
         </fieldset>
 

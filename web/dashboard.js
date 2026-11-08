@@ -124,7 +124,7 @@ async function refreshAccounts() {
       const rm = Object.assign(document.createElement("button"), { textContent: "연결 해제", className: "link" });
       rm.addEventListener("click", async () => {
         if (!confirm(`${a} 연결을 해제할까요?`)) return;
-        await api("/api/accounts/remove", { method: "POST", body: JSON.stringify({ username: a }) });
+        await api("/api/accounts/remove", { method: "POST", body: JSON.stringify({ username: a, type: d.type }) });
         refreshAccounts();
       });
       li.append(rm);
@@ -181,3 +181,30 @@ setInterval(refreshStatus, 15000);
 setInterval(() => { refreshActions(); refreshTodo(); }, 60000);
 
 bindTestAlarm();
+
+// ---------- key file (.env) location banner ----------
+async function refreshEnv(manual = false) {
+  let st;
+  try { st = await api("/api/env-status"); } catch (e) { return; }
+  $("env-folder").textContent = st.folder;
+  $("env-banner").hidden = st.has_key;
+  const ok = $("env-ok");
+  ok.hidden = !st.has_key;
+  ok.innerHTML = st.has_key
+    ? `🔑 키 파일(.env) 적용됨 · 위치 <code>${esc(st.folder)}</code>${st.fixed ? ` · ${esc(st.fixed)}` : ""}`
+    : "";
+  if (manual && !st.has_key) {
+    $("env-msg").textContent = st.env_exists
+      ? ".env 파일은 있지만 ROOT_API_KEY 값이 비어 있습니다. 받은 파일이 맞는지 확인해 주세요."
+      : "아직 .env 파일이 보이지 않습니다. 위 폴더에 넣었는지 확인해 주세요.";
+  }
+  if (manual && st.has_key) refreshAll();
+}
+$("env-copy").addEventListener("click", async () => {
+  const text = $("env-folder").textContent;
+  try { await navigator.clipboard.writeText(text); $("env-copy").textContent = "복사됨 ✓"; }
+  catch { const r = document.createRange(); r.selectNodeContents($("env-folder")); getSelection().removeAllRanges(); getSelection().addRange(r); }
+  setTimeout(() => ($("env-copy").textContent = "주소 복사"), 2000);
+});
+$("env-recheck").addEventListener("click", () => refreshEnv(true));
+refreshEnv();

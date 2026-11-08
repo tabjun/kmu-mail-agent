@@ -23,6 +23,20 @@
   </header>
 
   <main class="dash">
+    <section id="env-banner" class="banner env-banner" hidden>
+      <h2>🔑 먼저 키 파일(.env)을 넣어 주세요</h2>
+      <p class="muted">연구실에서 받은 <b>.env</b> 파일(ZIP으로 받았다면 압축을 푼 안의 .env)을 이 PC의 메일 비서 폴더에 넣어야 Claude가 메일을 읽을 수 있습니다.</p>
+      <ol class="env-steps">
+        <li>키보드에서 <kbd>Win</kbd> + <kbd>R</kbd>을 누릅니다.</li>
+        <li>열린 '실행' 창에 아래 주소를 붙여 넣고 <kbd>Enter</kbd>를 누릅니다.
+          <div class="path-box"><code id="env-folder"></code><button type="button" class="secondary small" id="env-copy">주소 복사</button></div>
+        </li>
+        <li>열린 폴더에 <b>.env</b> 파일을 넣어 주세요. (<code>설치하기.bat</code>이 있는 폴더입니다)</li>
+        <li>넣었으면 <button type="button" id="env-recheck" class="small">넣었어요 · 다시 확인</button> 을 누릅니다. <span id="env-msg" class="muted"></span></li>
+      </ol>
+    </section>
+    <p id="env-ok" class="env-ok muted" hidden></p>
+
     <section id="onboarding" class="banner" hidden>
       <h2>처음 오셨나요? 설정 마법사로 3단계만 하면 됩니다</h2>
       <ol class="steps">

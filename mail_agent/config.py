@@ -67,6 +67,9 @@ class Settings:
         default_factory=lambda: PROJECT_ROOT / _env("GOOGLE_CREDENTIALS_FILE", "secrets/google_credentials.json")
     )
     google_calendar_id: str = field(default_factory=lambda: _env("GOOGLE_CALENDAR_ID", "primary"))
+    # OAuth 'Desktop app' client for Google Calendar (Gmail users). Kept in .env, delivered with the key ZIP.
+    google_client_id: str | None = field(default_factory=lambda: _env("GOOGLE_CLIENT_ID"))
+    google_client_secret: str | None = field(default_factory=lambda: _env("GOOGLE_CLIENT_SECRET"), repr=False)
 
     # --- Behaviour ----------------------------------------------------------
     timezone: ZoneInfo = field(default_factory=lambda: ZoneInfo(_env("TIMEZONE", "Asia/Seoul")))

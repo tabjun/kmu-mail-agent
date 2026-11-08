@@ -64,6 +64,47 @@ def graph_runtime(settings: Settings, store: Store | None = None, need_graph: bo
     return Runtime(settings, store, auth, clients, cal, actions, imap)
 
 
+def build_calendar(settings: Settings, rt: Runtime):
+    """(calendar sink, main calendar account). Events follow the mailbox they came from:
+    Office 365/Outlook → same account's Outlook calendar, Gmail → same Gmail's Google Calendar (if connected).
+    The daily checklist and anything unmatched go to the main calendar (preferences.calendar_account)."""
+    from .calendars import OutlookCalendar, RoutingCalendar, make_calendar, route_key
+
+    if settings.calendar_provider.lower() != "outlook":  # ics / none / legacy google
+        return make_calendar(settings, rt.calendar_client), getattr(rt.calendar_client, "username", None)
+    from .google_cal import GoogleAuth, GoogleCalendar
+
+    gauth = GoogleAuth(settings)
+    google: dict = {}
+
+    def g(email: str):
+        if email.lower() not in google:
+            try:
+                google[email.lower()] = GoogleCalendar(settings, email, gauth)
+            except Exception as e:  # expired token etc. → fall back to the main calendar
+                log.warning("Google calendar %s unavailable: %s", email, e)
+                google[email.lower()] = None
+        return google[email.lower()]
+
+    by_account = {}
+    for c in rt.mail_clients or []:
+        by_account[route_key("", c.username)] = OutlookCalendar(c, settings)
+    for ic in rt.imap_clients or []:
+        if gauth.has(ic.username) and g(ic.username):
+            by_account[route_key("imap:", ic.username)] = g(ic.username)
+
+    main, wanted = None, settings.calendar_account or ""
+    if wanted.startswith("google:") and gauth.has(wanted[7:]):
+        main = g(wanted[7:])
+    if main is None and rt.calendar_client is not None:
+        main = OutlookCalendar(rt.calendar_client, settings)
+    if main is None:
+        main = next((x for x in (g(e) for e in gauth.accounts()) if x), None)
+    if main is None and not by_account:
+        return None, None
+    return RoutingCalendar(main, by_account), getattr(main, "username", None)
+
+
 _run_lock = threading.Lock()
 
 
@@ -72,7 +113,6 @@ def run_pipeline(settings: Settings, *, source=None, llm=None, store: Store | No
     """One full pass: fetch → triage → cleanup proposal → calendar → checklist → digest → notify."""
     from langgraph.checkpoint.sqlite import SqliteSaver
 
-    from .calendars import make_calendar
     from .graph import Deps, build_graph, initial_state
     from .llm import ClaudeLLM
     from .msgraph import GraphMailSource
@@ -91,10 +131,10 @@ def run_pipeline(settings: Settings, *, source=None, llm=None, store: Store | No
             source = rt.mail_source()
             if source is None:
                 raise RuntimeError("연결된 메일 계정이 없습니다. 대시보드의 '+ 계정 추가'에서 연결하세요.")
+        calendar, calendar_owner = build_calendar(settings, rt)
         deps = Deps(settings=settings, llm=llm or ClaudeLLM(settings), store=rt.store, source=source,
-                    calendar=make_calendar(settings, rt.calendar_client),
-                    notifiers=make_notifiers(settings, rt.calendar_client),
-                    calendar_owner=getattr(rt.calendar_client, "username", None), mail_actions=rt.mail_actions)
+                    calendar=calendar, notifiers=make_notifiers(settings, rt.calendar_client),
+                    calendar_owner=calendar_owner, mail_actions=rt.mail_actions)
         now = now or datetime.now(settings.timezone)
         conn = sqlite3.connect(settings.checkpoint_path, check_same_thread=False)
         try:

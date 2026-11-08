@@ -178,3 +178,39 @@ def test_multiple_reminders_become_extra_alarm_events(settings):  # noqa: F811
     assert len(keys) == 2 and len(set(keys)) == 2  # main (1 day before) + 2-day-before alarm
     # alarms already in the past are skipped
     assert build_extra_reminder_specs(email, meet, settings, NOW.replace(day=12, hour=13, minute=30)) == []
+
+
+def test_events_go_to_the_calendar_of_the_mailbox_they_came_from():
+    """Gmail (IMAP) mail → that Gmail's Google Calendar, Office 365 mail → same account's Outlook calendar,
+    even when both mailboxes share one address; the checklist goes to the main calendar."""
+    from datetime import datetime, timedelta
+
+    from mail_agent.calendars import EventSpec, RoutingCalendar, route_key
+
+    class Sink:
+        def __init__(self, name):
+            self.name, self.got = name, []
+
+        def create(self, spec):
+            self.got.append(spec.title)
+            return f"{self.name}-{len(self.got)}"
+
+        def update(self, spec, event_id):
+            return event_id
+
+    main, gmail_cal, outlook_cal = Sink("outlook"), Sink("google"), Sink("outlook")
+    cal = RoutingCalendar(main, {route_key("imap:", "me@gmail.com"): gmail_cal,
+                                 route_key("", "me@gmail.com"): outlook_cal})
+    t = datetime(2026, 11, 12, 15, 0)
+
+    def spec(title, mid, account, kind="meeting"):
+        return EventSpec(title, mid, title, kind, t, t + timedelta(hours=1), False, None, "", 30, account, (60, 30))
+
+    cal.create(spec("gmail meeting", "imap:me@gmail.com:1:7", "me@gmail.com"))
+    cal.create(spec("outlook meeting", "AAMk123", "me@gmail.com"))
+    cal.create(spec("other mailbox", "imap:x@naver.com:1:1", "x@naver.com"))
+    assert cal.create(spec("[미리 알림] gmail", "imap:me@gmail.com:1:7", "me@gmail.com", "reminder")) == "merged-into-event"
+    cal.create(spec("✅ 오늘 할 일", "checklist", None, "checklist"))
+    assert gmail_cal.got == ["gmail meeting"]
+    assert outlook_cal.got == ["outlook meeting"]
+    assert main.got == ["other mailbox", "✅ 오늘 할 일"]

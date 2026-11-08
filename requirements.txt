@@ -15,8 +15,8 @@ pyjwt[crypto]>=2.10
 keyring>=25
 # Claude Desktop integration
 mcp>=2.3
-# optional: Google Calendar
-# google-api-python-client
-# google-auth-oauthlib
+# Google Calendar for Gmail accounts
+google-api-python-client>=2.150
+google-auth-oauthlib>=1.2
 # dev
 pytest>=8
