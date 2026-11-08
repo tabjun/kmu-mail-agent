@@ -296,30 +296,10 @@ def create_app(settings: Settings | None = None, store: Store | None = None, llm
                  "google_client_id", "google_client_secret")
 
     def _adopt_key_file() -> str | None:
-        """The key file often lands one step off: inside a 'kmu-mail-agent-key' subfolder (Windows' default when
-        extracting), as '.env.txt', or still zipped in this folder / Downloads. Put it where it belongs."""
-        import shutil
-        import zipfile
+        """The .env the lab sent usually sits in Downloads / '카카오톡 받은 파일', often renamed. Bring it here."""
+        from .keyfile import adopt_key_file
 
-        env_path = PROJECT_ROOT / ".env"
-        if env_path.exists():
-            return None
-        sub = PROJECT_ROOT / "kmu-mail-agent-key" / ".env"
-        if sub.exists():
-            shutil.copyfile(sub, env_path)
-            return "kmu-mail-agent-key 폴더 안의 .env를 옮겨 적용했습니다."
-        txt = PROJECT_ROOT / ".env.txt"
-        if txt.exists() and "ROOT_API_KEY" in txt.read_text(encoding="utf-8", errors="ignore"):
-            txt.rename(env_path)
-            return "'.env.txt'로 저장된 파일을 '.env'로 바꿔 적용했습니다."
-        for z in (PROJECT_ROOT / "kmu-mail-agent-key.zip", Path.home() / "Downloads" / "kmu-mail-agent-key.zip"):
-            if z.exists():
-                with zipfile.ZipFile(z) as zf:
-                    name = next((n for n in zf.namelist() if n.endswith(".env")), None)
-                    if name:
-                        env_path.write_bytes(zf.read(name))
-                        return f"{z.name}에서 .env를 꺼내 적용했습니다."
-        return None
+        return adopt_key_file(PROJECT_ROOT)
 
     @app.get("/api/env-status")
     def env_status(user: dict = Depends(require_user)):
@@ -332,7 +312,7 @@ def create_app(settings: Settings | None = None, store: Store | None = None, llm
         fixed = _adopt_key_file()
         env_path = PROJECT_ROOT / ".env"
         if env_path.exists():
-            for k, v in dotenv_values(env_path).items():
+            for k, v in dotenv_values(env_path, encoding="utf-8-sig").items():
                 if v:
                     os.environ[k] = v
             fresh = Settings()

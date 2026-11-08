@@ -16,9 +16,11 @@ Office 365(Outlook) 메일을 주기적으로 읽어 Claude로 분류하고, 할
 2. 가상환경과 패키지:
    - `python -m venv .venv`
    - `.venv\Scripts\pip install -r requirements.txt`
-3. `.env` 만들기: 사용자가 연구실에서 받은 **`kmu-mail-agent-key.zip`**(안에 `.env` 하나)이 있으면 프로젝트 폴더에 풀어 그대로 씁니다
-   (보통 다운로드 폴더에 있음). 없으면 `.env.example`을 복사하고 **`ROOT_API_KEY`와 `ANTHROPIC_WORKSPACE_ID`는 사용자에게 받아서** 채웁니다.
-   - 권장 설치 위치: `%USERPROFILE%\schedule` (교수님이 만든 schedule 폴더를 Code 탭 작업 폴더로 고르고, 그 안에 바로 받음) (OneDrive 동기화 폴더는 피함)
+3. `.env` 만들기: 사용자는 보통 연구실에서 **`.env` 파일을 직접** 받습니다(카카오톡·메일). 다운로드·바탕 화면·'카카오톡 받은 파일' 폴더에
+   `env`, `.env.txt`, `.env (1)`처럼 이름이 바뀌어 있을 수 있습니다. `mail_agent/keyfile.py`(설치 스크립트와 대시보드 '다시 확인'이 사용)가
+   ROOT_API_KEY 값이 든 파일을 찾아 프로젝트 폴더의 `.env`로 복사합니다. 못 찾으면 사용자에게 파일 위치를 묻고,
+   그래도 없으면 `.env.example`을 복사한 뒤 **`ROOT_API_KEY`와 `ANTHROPIC_WORKSPACE_ID`를 사용자에게 받아서** 채웁니다.
+   - 권장 설치 위치: `%USERPROFILE%\schedule` (교수님이 만든 schedule 폴더를 Code 탭 작업 폴더로 고르고, 그 안에 바로 받음)
    - 키 값은 대화에 다시 출력하지 마세요.
    - `MS_CLIENT_ID`는 예시 값을 그대로 둡니다.
 4. 동작 확인: `.venv\Scripts\python -m mail_agent check-key` → "✅ API 키 유효"

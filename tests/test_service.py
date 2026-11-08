@@ -248,3 +248,20 @@ def test_cleanup_rules_are_learned_from_approvals_with_guardrails(tmp_path):
     assert [r.kind for r in saved.cleanup.learned] == ["cleanup", "keep"]
     rules = saved.to_prompt_rules()
     assert "채용 플랫폼" in rules and "연구재단 메일은 남긴다" in rules
+
+
+def test_key_file_sent_by_messenger_is_found_even_if_renamed(tmp_path):
+    from mail_agent.keyfile import adopt_key_file
+
+    home, project = tmp_path / "home", tmp_path / "home" / "schedule"
+    kakao = home / "Documents" / "카카오톡 받은 파일"
+    for d in (project, home / "Downloads", kakao):
+        d.mkdir(parents=True)
+    (home / "Downloads" / "environment-notes.txt").write_text("nothing here", encoding="utf-8")
+    (home / "Downloads" / "old.env").write_text("ROOT_API_KEY=\n", encoding="utf-8")          # empty key → ignored
+    (kakao / ".env (1)").write_text("ROOT_API_KEY=sk-test-123\nANTHROPIC_WORKSPACE_ID=w\n", encoding="utf-8-sig")  # BOM, like Notepad
+    msg = adopt_key_file(project, home)
+    assert msg and ".env (1)" in msg
+    assert "sk-test-123" not in msg                                     # never echo the key
+    assert (project / ".env").read_text(encoding="utf-8").startswith("ROOT_API_KEY=sk-test-123")
+    assert adopt_key_file(project, home) is None                        # existing .env is left alone

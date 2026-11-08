@@ -73,23 +73,11 @@ Ok "설치 완료"
 Step 3 "Claude API 키 설정 (.env 파일)"
 $EnvPath = Join-Path $ProjectDir ".env"
 if (-not (Test-Path $EnvPath)) {
-    # 연구실에서 따로 받은 키 파일(kmu-mail-agent-key.zip)을 찾아서 씀:
-    # 압축을 하위 폴더에 풀었거나, ZIP이 이 폴더나 다운로드 폴더에 그대로 있는 경우
-    $keySub = Join-Path $ProjectDir "kmu-mail-agent-key\.env"
-    $downloads = Join-Path $env:USERPROFILE "Downloads"
-    try { $downloads = (New-Object -ComObject Shell.Application).NameSpace("shell:Downloads").Self.Path } catch {}
-    $keyZip = @((Join-Path $ProjectDir "kmu-mail-agent-key.zip"), (Join-Path $downloads "kmu-mail-agent-key.zip")) |
-        Where-Object { Test-Path $_ } | Select-Object -First 1
-    if (Test-Path $keySub) {
-        Copy-Item $keySub $EnvPath
-        Ok "키 파일(.env)을 kmu-mail-agent-key 폴더에서 찾아 옮겼습니다."
-    } elseif ($keyZip) {
-        $tmp = Join-Path $env:TEMP ("kmu-key-" + [guid]::NewGuid())
-        Expand-Archive -Path $keyZip -DestinationPath $tmp -Force
-        $found = Get-ChildItem -Path $tmp -Filter ".env" -Recurse -Force | Select-Object -First 1
-        if ($found) { Copy-Item $found.FullName $EnvPath; Ok "키 파일을 찾아 적용했습니다: $keyZip" }
-        Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue
-    }
+    # 연구실에서 받은 .env 파일을 찾아서 씀: 다운로드·바탕 화면·'카카오톡 받은 파일' 폴더에서
+    # 'env', '.env.txt', '.env (1)'처럼 이름이 바뀌었어도 ROOT_API_KEY 값이 든 파일이면 가져옴 (값은 출력하지 않음)
+    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+    $msg = & $VenvPy -X utf8 -c "import pathlib,sys; from mail_agent.keyfile import adopt_key_file; m=adopt_key_file(pathlib.Path(sys.argv[1])); print(m or '')" $ProjectDir
+    if ($msg) { Ok $msg }
 }
 if (-not (Test-Path $EnvPath)) {
     Copy-Item (Join-Path $ProjectDir ".env.example") $EnvPath

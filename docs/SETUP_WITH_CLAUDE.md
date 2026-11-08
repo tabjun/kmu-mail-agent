@@ -9,7 +9,8 @@
 ## 준비물
 - Windows PC: 항상 켜 두는 연구실 PC를 권합니다.
 - Claude Desktop 앱
-- **`kmu-mail-agent-key.zip`**: Claude API 키가 든 파일입니다. 담당 학생이 메신저·메일로 따로 보내 드립니다. **다운로드** 폴더에 저장해 두세요.
+- **`.env` 파일**: Claude API 키가 든 파일입니다. 담당 학생이 카카오톡·메일로 따로 보내 드립니다. 받은 파일은 **다운로드**(또는 '카카오톡 받은 파일') 폴더에 저장된 그대로 두세요.
+  저장할 때 이름이 `env`나 `.env.txt`로 바뀌어도 괜찮습니다.
 - 학교 Office 365 계정(@ms.kmu.ac.kr)
 
 ## 1. 프로그램을 둘 `schedule` 폴더 만들기 (1분)
@@ -31,9 +32,10 @@ GitHub 저장소 https://github.com/tabjun/kmu-mail-agent 의 '메일 비서'를
 1. 저장소를 이 폴더 안에 바로 받아 줘(하위 폴더를 따로 만들지 말고, 설치하기.bat이 이 폴더 바로 안에 오게).
    폴더가 비어 있지 않으면 임시 폴더에 받은 뒤 내용을 이 폴더로 옮겨 줘.
    git이 없으면 https://github.com/tabjun/kmu-mail-agent/archive/refs/heads/main.zip 을 내려받아 같은 방식으로 풀어 줘.
-2. API 키는 따로 받은 kmu-mail-agent-key.zip 안의 .env 파일에 있어. 다운로드 폴더에 있으니 이 폴더에 풀어서
-   .env가 설치하기.bat 옆에 오게 해 줘. .env 안의 값은 화면에 보여주지 말고,
-   ROOT_API_KEY와 ANTHROPIC_WORKSPACE_ID 값이 들어 있는지만 확인해 줘. 못 찾으면 나에게 물어봐.
+2. API 키는 내가 따로 받은 .env 파일에 있어. 다운로드 폴더(또는 문서\카카오톡 받은 파일)에 있고, 이름이 env나 .env.txt로
+   바뀌었을 수 있어. 그 파일을 이 폴더로 복사해서 이름을 .env로 해 줘(설치하기.bat 옆에 오게).
+   .env 안의 값은 화면에 보여주지 말고, ROOT_API_KEY와 ANTHROPIC_WORKSPACE_ID 값이 들어 있는지만 확인해 줘.
+   못 찾으면 나에게 어디에 저장했는지 물어봐.
 3. 받은 폴더의 CLAUDE.md를 먼저 읽고, 거기 적힌 '처음 설치' 순서를 따라 줘.
    (.env가 이미 있으니 키 입력 없이 scripts\setup_windows.ps1 -NoPrompt 로 1~6단계를 한 번에)
 4. 설치가 끝나면 항상 켜지는 서비스로 등록하고, 브라우저에서 http://localhost:3000/setup 을 열어 줘.
@@ -45,8 +47,8 @@ GitHub 저장소 https://github.com/tabjun/kmu-mail-agent 의 '메일 비서'를
 
 ## 4. 진행 중에 교수님이 직접 하실 일
 - Claude가 명령 실행 허락을 물으면 **허용**을 누릅니다.
-- 키 파일을 못 찾는다고 하면 다운로드 폴더의 `kmu-mail-agent-key.zip`을 `C:\Users\(이름)\schedule`에 풀어 주세요
-  (ZIP 오른쪽 버튼 → 압축 풀기 → 위 폴더 선택). 폴더 안에 `.env` 파일이 생기면 됩니다.
+- Claude가 키 파일을 못 찾는다고 하면, 받은 `.env` 파일을 `C:\Users\(이름)\schedule` 폴더로 끌어다 놓으세요
+  (`설치하기.bat`이 있는 폴더). 이름이 `env`로 보이면 `.env`로 바꿔도 되고, 그대로 두어도 메일 비서가 알아서 찾습니다.
   대시보드 맨 위에도 키 파일을 넣을 정확한 위치가 나옵니다(Win+R → 주소 붙여 넣기 → Enter → 열린 폴더에 .env 넣기).
 - 설정 마법사 1단계에서 학교 메일 주소를 입력하고 **연결하기**를 누릅니다. Microsoft 로그인 창이 열리면 계정을 고르고 **수락**을 누릅니다.
   - "관리자 승인 필요"가 뜨면 학교 승인이 아직 안 된 것입니다. 정보통신처에 [요청서](admin-consent-request.md)를 보내세요.
