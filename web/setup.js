@@ -116,16 +116,7 @@ document.querySelectorAll("[data-add]").forEach((b) => b.addEventListener("click
   renderChips(kind);
 }));
 
-$("test-alarm").addEventListener("click", async () => {
-  const msg = $("test-alarm-msg");
-  $("test-alarm").disabled = true;
-  msg.textContent = "Outlook 캘린더에 넣는 중…";
-  try {
-    const r = await api("/api/calendar/test-alarm", { method: "POST" });
-    msg.innerHTML = `✅ <b>${esc(r.at)}</b>에 울리는 '🔔 테스트 알림'을 ${esc(r.account)} 캘린더에 넣었습니다. PC·휴대폰에서 울리는지 확인하세요.`;
-  } catch (e) { msg.textContent = e.message.replace(/^\d+ /, ""); }
-  finally { $("test-alarm").disabled = false; }
-});
+bindTestAlarm();
 
 // ---------- step 2: basic settings ----------
 async function fillForm() {

@@ -49,6 +49,13 @@ class GraphAuth:
         """Usernames signed in on this PC (work/school and personal Microsoft accounts)."""
         return [a["username"] for a in self.app.get_accounts()]
 
+    MSA_TENANT = "9188040d-6c67-4c5b-b112-36a304b66dad"  # personal Microsoft accounts (outlook.com 등)
+
+    def is_personal(self, username: str) -> bool:
+        for a in self.app.get_accounts(username=username):
+            return a.get("realm") == self.MSA_TENANT or str(a.get("home_account_id", "")).endswith(self.MSA_TENANT)
+        return False
+
     def login_interactive(self, login_hint: str | None = None, timeout: int = 300) -> str:
         """One-click sign-in: opens the Microsoft login page in the default browser and
         receives the result on http://localhost (no code to copy). Returns the username."""

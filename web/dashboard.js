@@ -180,13 +180,4 @@ refreshAll();
 setInterval(refreshStatus, 15000);
 setInterval(() => { refreshActions(); refreshTodo(); }, 60000);
 
-$("test-alarm").addEventListener("click", async () => {
-  const msg = $("test-alarm-msg");
-  $("test-alarm").disabled = true;
-  msg.textContent = "Outlook 캘린더에 넣는 중…";
-  try {
-    const r = await api("/api/calendar/test-alarm", { method: "POST" });
-    msg.innerHTML = `✅ ${esc(r.at)}에 울립니다 (${esc(r.account)})`;
-  } catch (e) { msg.textContent = e.message.replace(/^\d+ /, ""); }
-  finally { $("test-alarm").disabled = false; }
-});
+bindTestAlarm();

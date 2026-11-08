@@ -544,7 +544,10 @@ def create_app(settings: Settings | None = None, store: Store | None = None, llm
             log_event("test_alarm_failed", error=str(e)[:300])
             raise HTTPException(502, f"테스트 알림을 넣지 못했습니다: {str(e)[:200]}") from e
         log_event("test_alarm", account=rt.calendar_client.username, at=spec.start.isoformat(timespec="minutes"))
-        return {"ok": True, "account": rt.calendar_client.username, "at": spec.start.strftime("%H:%M"), "event_id": event_id}
+        personal = rt.calendar_client.auth.is_personal(rt.calendar_client.username)
+        return {"ok": True, "account": rt.calendar_client.username, "at": spec.start.strftime("%H:%M"), "event_id": event_id,
+                "personal": personal,
+                "web_url": "https://outlook.live.com/calendar/" if personal else "https://outlook.office.com/calendar/"}
 
     @app.get("/api/health/full")
     def health_full(user: dict = Depends(require_user)):
