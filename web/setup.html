@@ -72,21 +72,43 @@
       <form id="prefs-form" class="form-grid">
         <fieldset>
           <legend>⏰ 알림</legend>
+          <div class="alarm-explain">
+            <strong>🔔 알림은 이렇게 옵니다</strong>
+            <span>메일 비서가 Outlook 캘린더에 일정을 넣을 때 <b>알림</b>을 함께 설정합니다. 그 시각이 되면
+              <b>PC의 Outlook·Windows 알림</b>과 <b>휴대폰 Outlook 앱</b>(같은 Microsoft 계정, 알림 허용)에서 울립니다.
+              아이폰·갤럭시 기본 캘린더에 이 Outlook 계정을 추가해도 됩니다.</span>
+            <div class="row tight">
+              <button type="button" id="test-alarm" class="secondary small">🔔 테스트 알림 보내기 (2분 뒤)</button>
+              <span id="test-alarm-msg" class="muted"></span>
+            </div>
+          </div>
           <label>매일 '오늘 할 일' 알림 시각
             <input type="time" id="f-checklist" value="08:00">
             <small>이 시각에 캘린더 일정이 울리고, 본문에 우선순위별 체크리스트가 들어갑니다.</small>
           </label>
-          <label>마감 일정 알림
-            <select id="f-deadline">
-              <option value="1440">하루 전</option><option value="2880">이틀 전</option>
-              <option value="180">3시간 전</option><option value="60">1시간 전</option>
-            </select>
-          </label>
-          <label>회의·면담 알림
-            <select id="f-meeting">
-              <option value="10">10분 전</option><option value="30" selected>30분 전</option><option value="60">1시간 전</option>
-            </select>
-          </label>
+          <span></span>
+          <div class="field">
+            <span class="field-label">회의·면담 알림 <small class="inline">여러 개를 고르면 시점마다 울립니다</small></span>
+            <div class="chip-set" id="meeting-chips"></div>
+            <div class="custom-add">
+              <span>직접 입력</span>
+              <input type="number" min="1" max="999" id="meeting-n" placeholder="예: 45">
+              <select id="meeting-u"><option value="1">분</option><option value="60">시간</option><option value="1440">일</option></select>
+              <span>전</span>
+              <button type="button" class="secondary small" data-add="meeting">추가</button>
+            </div>
+          </div>
+          <div class="field">
+            <span class="field-label">마감 일정 알림 <small class="inline">여러 개를 고르면 시점마다 울립니다</small></span>
+            <div class="chip-set" id="deadline-chips"></div>
+            <div class="custom-add">
+              <span>직접 입력</span>
+              <input type="number" min="1" max="999" id="deadline-n" placeholder="예: 6">
+              <select id="deadline-u"><option value="60">시간</option><option value="1440">일</option><option value="1">분</option></select>
+              <span>전</span>
+              <button type="button" class="secondary small" data-add="deadline">추가</button>
+            </div>
+          </div>
           <div class="field">
             <span class="field-label">문서·보고서처럼 준비가 필요한 마감은 미리 점검 알림</span>
             <div class="checks">

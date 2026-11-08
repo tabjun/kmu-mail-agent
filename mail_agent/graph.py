@@ -23,7 +23,7 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.types import Send, interrupt
 
 from .actions import execute_action
-from .calendars import CalendarSink, build_checklist_spec, build_precheck_specs, build_spec
+from .calendars import CalendarSink, build_checklist_spec, build_precheck_specs, build_spec, event_specs
 from .config import Settings
 from .digest import fmt_due, items_for_llm, render_html, render_text
 from .llm import LLM
@@ -231,21 +231,14 @@ def build_graph(deps: Deps, checkpointer=None):
             if it.carried_over or it.source != "llm":
                 continue
             for ev in it.triage.events:
-                spec = build_spec(it.email, ev, s)
-                if spec is None or deps.store.calendar_event_exists(spec.key):
-                    continue
-                entry = {"key": spec.key, "message_id": it.email.id, "event": ev.model_dump(mode="json"),
-                         "title": spec.title, "when": _when_label(spec, now_of(state)),
-                         "evidence": ev.evidence}
                 auto = it.triage.confidence >= s.auto_calendar_confidence and ev.kind in ("deadline", "meeting")
-                (plan if auto else review).append(entry)
-                for pre in build_precheck_specs(it.email, ev, s, now_of(state)):
-                    if deps.store.calendar_event_exists(pre.key):
+                for sp in event_specs(it.email, ev, s, now_of(state)):
+                    if deps.store.calendar_event_exists(sp.key):
                         continue
                     (plan if auto else review).append({
-                        "key": pre.key, "message_id": it.email.id, "event": ev.model_dump(mode="json"),
-                        "title": pre.title, "when": _when_label(pre, now_of(state)), "evidence": ev.evidence,
-                        "precheck": True})
+                        "key": sp.key, "message_id": it.email.id, "event": ev.model_dump(mode="json"),
+                        "title": sp.title, "when": _when_label(sp, now_of(state)), "evidence": ev.evidence,
+                        "extra": sp.kind in ("precheck", "reminder")})
         return {"calendar_plan": plan, "needs_review": review}
 
     def route_review(state: AgentState) -> str:
@@ -266,10 +259,9 @@ def build_graph(deps: Deps, checkpointer=None):
         for p in state.get("calendar_plan", []):
             it = items[p["message_id"]]
             ev = next(e for e in it.triage.events if e.model_dump(mode="json") == p["event"])
-            if p.get("precheck"):
-                spec = next(x for x in build_precheck_specs(it.email, ev, s, now_of(state)) if x.key == p["key"])
-            else:
-                spec = build_spec(it.email, ev, s)
+            spec = next((x for x in event_specs(it.email, ev, s, now_of(state)) if x.key == p["key"]), None)
+            if spec is None:  # e.g. an alarm time that has passed since planning
+                continue
             try:
                 event_id = deps.calendar.create(spec)
                 deps.store.save_calendar_event(spec.key, it.email.id, deps.calendar.name, event_id, spec.title,

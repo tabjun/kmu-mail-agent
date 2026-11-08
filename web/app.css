@@ -249,3 +249,14 @@ details > summary { cursor: pointer; color: var(--accent); margin-top: 10px; fon
 .small-help { font-size: 12px; }
 #account-list li { gap: 10px; }
 @media (max-width: 900px) { .imap-form { grid-template-columns: 1fr; } }
+
+/* alarm chips */
+.alarm-explain { grid-column: 1 / -1; background: var(--accent-soft); border-radius: 10px; padding: 12px 14px; font-size: 14px;
+                 display: flex; flex-direction: column; gap: 6px; margin: 4px 0 8px; }
+.chip-set { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+.tchip { background: var(--surface); color: var(--fg); border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px; font-size: 13px; }
+.tchip.on { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); font-weight: 600; }
+.custom-add { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
+.custom-add input[type=number] { width: 80px; display: inline-block; min-width: 0; margin: 0; }
+.custom-add select { display: inline-block; min-width: 0; width: auto; margin: 0; }
+small.inline { display: inline; color: var(--muted); margin-left: 6px; }

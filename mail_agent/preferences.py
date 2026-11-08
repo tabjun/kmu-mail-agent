@@ -42,8 +42,18 @@ class CalendarPolicy(BaseModel):
     precheck_days: list[int] = Field(default_factory=lambda: [3, 1],
                                      description="준비가 필요한 마감(문서 작성·검토·제출) 전에 넣을 점검 알림 일수")
     precheck_time: str = Field("09:00", description="점검 알림 시각")
-    deadline_reminder_minutes: int = Field(24 * 60, description="마감 일정 알림 (분 전)")
-    meeting_reminder_minutes: int = Field(30, description="회의 일정 알림 (분 전)")
+    deadline_reminder_minutes: int = Field(24 * 60, description="(이전 버전 호환) 마감 알림 분 전 — deadline_reminders 사용")
+    meeting_reminder_minutes: int = Field(30, description="(이전 버전 호환) 회의 알림 분 전 — meeting_reminders 사용")
+    deadline_reminders: list[int] = Field(default_factory=list,
+                                          description="마감 일정 알림 시점 목록(분 전). 여러 개면 시점마다 알림. 예: [1440, 60]")
+    meeting_reminders: list[int] = Field(default_factory=list,
+                                         description="회의·면담 알림 시점 목록(분 전). 예: [60, 10]")
+
+    def deadline_list(self) -> list[int]:
+        return sorted(set(self.deadline_reminders or [self.deadline_reminder_minutes]), reverse=True)
+
+    def meeting_list(self) -> list[int]:
+        return sorted(set(self.meeting_reminders or [self.meeting_reminder_minutes]), reverse=True)
     auto_add_confidence: float = Field(0.8, description="이 확신도 이상이면 묻지 않고 캘린더에 추가")
     add_events: bool = Field(True, description="메일 속 행사/세미나도 '확인 필요'로 제안할지")
 

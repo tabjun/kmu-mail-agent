@@ -95,7 +95,9 @@ AGENTS: dict[str, AgentSpec] = {
         description="오늘 할 일 알림 시각, 문서 마감 점검 알림, 회의·마감 알림 시점을 세부 조정합니다.",
         system="""당신은 'KMU Mail Agent'의 **캘린더·알림 에이전트**입니다. 담당 범위는 오직 calendar 설정입니다:
 checklist_time(매일 '오늘 할 일' 알림 시각), precheck_days/precheck_time(준비가 필요한 마감의 점검 알림),
-deadline_reminder_minutes, meeting_reminder_minutes, auto_add_confidence(자동 등록 확신도), add_events.
+deadline_reminders / meeting_reminders(알림 시점 목록, 분 단위. 여러 개면 시점마다 알림), auto_add_confidence(자동 등록 확신도), add_events.
+알림은 Outlook 캘린더 일정의 알림으로 PC·휴대폰 Outlook 앱에 울립니다. 일정 하나에는 알림이 하나라서,
+추가 알림 시점은 '[미리 알림]' 짧은 일정으로 들어간다는 점을 필요할 때 설명합니다.
 
 ## 진행
 1. get_status로 현재 값을 한 줄씩 보여주고 선택지를 줍니다:
@@ -128,6 +130,10 @@ def check_patch(agent: AgentSpec, patch: dict) -> None:
 # ---------------------------------------------------------------------------
 # Opening messages (templates over stored data — no model call, no hallucination)
 # ---------------------------------------------------------------------------
+def _fmt_offset(m: int) -> str:
+    return f"{m // 1440}일 전" if m % 1440 == 0 else (f"{m // 60}시간 전" if m % 60 == 0 else f"{m}분 전")
+
+
 def _bullets(items: list[str], empty: str = "없음") -> str:
     return "\n".join(f"- {x}" for x in items) if items else f"- {empty}"
 
@@ -154,6 +160,7 @@ def greeting(agent_id: str, prefs: Preferences, store: Store, now: datetime, own
         pre = ", ".join(f"D-{d}" for d in c.precheck_days) or "끔"
         return (f"캘린더 알림을 어떻게 조정할까요?\n지금 설정:\n"
                 f"- 오늘 할 일 알림: {c.checklist_time or '끔'}\n- 준비가 필요한 마감 점검 알림: {pre} {c.precheck_time}\n"
-                f"- 마감 알림: {c.deadline_reminder_minutes // 60}시간 전 · 회의 알림: {c.meeting_reminder_minutes}분 전\n\n"
+                f"- 마감 알림: {', '.join(_fmt_offset(m) for m in c.deadline_list())} · "
+                f"회의 알림: {', '.join(_fmt_offset(m) for m in c.meeting_list())}\n\n"
                 "예시) **알림을 7시 30분으로** / **보고서는 3일 전·1일 전 점검** / **회의는 1시간 전 알림**")
     raise KeyError(agent_id)

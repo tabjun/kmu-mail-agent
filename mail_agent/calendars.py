@@ -56,8 +56,9 @@ def build_spec(email: Email, ev: ExtractedEvent, settings: Settings) -> EventSpe
         start = end - timedelta(minutes=30)
     else:
         end = parse_when(ev.end, tz, end_of_day=False) or start + timedelta(hours=1)
-    reminder = {"deadline": settings.deadline_reminder_minutes,
-                "meeting": settings.meeting_reminder_minutes, "event": 60}.get(ev.kind, 60)
+    reminder = {"deadline": min(settings.deadline_reminders or [settings.deadline_reminder_minutes]),
+                "meeting": min(settings.meeting_reminders or [settings.meeting_reminder_minutes]),
+                "event": 60}.get(ev.kind, 60)
     title = ev.title if ev.title.startswith("[") else f"[{KIND_KO[ev.kind]}] {ev.title}"
     body = (
         f"메일: {email.subject}\n보낸 사람: {email.sender_name} <{email.sender_email}>\n"
@@ -88,6 +89,56 @@ def build_precheck_specs(email: Email, ev: ExtractedEvent, settings: Settings, n
         specs.append(EventSpec(key, email.id, title, "precheck", start, start + timedelta(minutes=15), False,
                                None, body, 0))
     return specs
+
+
+def _offset_label(minutes: int) -> str:
+    if minutes % 1440 == 0:
+        return f"{minutes // 1440}일 전"
+    if minutes % 60 == 0:
+        return f"{minutes // 60}시간 전"
+    return f"{minutes}분 전"
+
+
+def build_extra_reminder_specs(email: Email, ev: ExtractedEvent, settings: Settings, now: datetime) -> list[EventSpec]:
+    """Outlook events hold a single alarm, so additional alarm times become short
+    '[미리 알림 · 1시간 전] …' events that ring at their own start."""
+    main = build_spec(email, ev, settings)
+    if main is None or main.all_day or ev.kind not in ("deadline", "meeting"):
+        return []
+    offsets = settings.deadline_reminders if ev.kind == "deadline" else settings.meeting_reminders
+    closest = min(offsets) if offsets else 0
+    anchor = main.end if ev.kind == "deadline" else main.start  # deadline time / meeting start
+    base = main.title[main.title.find("]") + 1:].strip() if main.title.startswith("[") else main.title
+    specs = []
+    for off in sorted(set(offsets), reverse=True):
+        if off == closest:
+            continue  # carried by the event itself
+        start = anchor - timedelta(minutes=off)
+        if start <= now:
+            continue
+        key = hashlib.sha256(f"{main.key}|remind|{off}".encode()).hexdigest()[:32]
+        what = "마감" if ev.kind == "deadline" else "시작"
+        body = f"{_fmt_short(anchor, settings.timezone)} {what}: {base}\n\n{main.body}"
+        specs.append(EventSpec(key, email.id, f"[미리 알림 · {_offset_label(off)}] {base}", "reminder",
+                               start, start + timedelta(minutes=5), False, None, body, 0))
+    return specs
+
+
+def event_specs(email: Email, ev: ExtractedEvent, settings: Settings, now: datetime) -> list[EventSpec]:
+    """All calendar entries one extracted event produces: the event, pre-check alarms, extra alarms."""
+    main = build_spec(email, ev, settings)
+    if main is None:
+        return []
+    return [main] + build_precheck_specs(email, ev, settings, now) + build_extra_reminder_specs(email, ev, settings, now)
+
+
+def build_test_alarm_spec(settings: Settings, now: datetime) -> EventSpec:
+    start = (now + timedelta(minutes=2)).replace(second=0, microsecond=0)
+    key = hashlib.sha256(f"test-alarm|{start.isoformat()}".encode()).hexdigest()[:32]
+    body = ("메일 비서 테스트 알림입니다. 이 알림이 PC와 휴대폰 Outlook 앱에 울리면 연동이 정상입니다.\n"
+            "확인했으면 이 일정은 지워도 됩니다.")
+    return EventSpec(key, "test-alarm", "🔔 메일 비서 테스트 알림", "reminder", start, start + timedelta(minutes=5),
+                     False, None, body, 0)
 
 
 class CalendarSink(Protocol):
@@ -159,7 +210,7 @@ class OutlookCalendar:
             "isReminderOn": True,
             "reminderMinutesBeforeStart": spec.reminder_minutes,
             "categories": ["MailAgent"],
-            "showAs": "free" if spec.kind in ("deadline", "checklist", "precheck") else "busy",
+            "showAs": "free" if spec.kind in ("deadline", "checklist", "precheck", "reminder") else "busy",
             "transactionId": spec.key,  # Graph de-duplicates retries with the same id
         }
         if spec.location:

@@ -157,3 +157,24 @@ def test_scoped_agents_guardrails(settings, monkeypatch):  # noqa: F811
     # 5) the cleanup opening message is a template over stored data
     text = greeting("cleanup", Preferences(), store, NOW.replace(year=2026), owner="교수님")
     assert "어떤 내용의 메일을 정리할까요?" in text and "(광고) 할인" in text and "예시)" in text
+
+
+def test_multiple_reminders_become_extra_alarm_events(settings):  # noqa: F811
+    from mail_agent.calendars import build_extra_reminder_specs, build_spec, event_specs
+
+    ps = PreferencesStore(settings.prefs_path)
+    ps.update({"calendar": {"meeting_reminders": [1440, 60, 10], "deadline_reminders": [2880, 1440], "precheck_days": []}})
+    settings.apply_preferences()
+    email = Email(id="m1", received_at=NOW, subject="면담")
+    meet = ExtractedEvent(title="[면담] 김대학원", kind="meeting", start="2026-11-12T14:00:00+09:00",
+                          end="2026-11-12T14:30:00+09:00", all_day=False, evidence="x")
+    main = build_spec(email, meet, settings)
+    assert main.reminder_minutes == 10  # closest alarm rides on the event itself
+    extra = build_extra_reminder_specs(email, meet, settings, NOW)
+    assert [s.title for s in extra] == ["[미리 알림 · 1일 전] 김대학원", "[미리 알림 · 1시간 전] 김대학원"]
+    assert extra[1].start.hour == 13 and extra[1].reminder_minutes == 0
+    dl = ExtractedEvent(title="[마감] 보고서", kind="deadline", start="2026-11-13T18:00:00+09:00", all_day=False, evidence="y")
+    keys = [s.key for s in event_specs(email, dl, settings, NOW)]
+    assert len(keys) == 2 and len(set(keys)) == 2  # main (1 day before) + 2-day-before alarm
+    # alarms already in the past are skipped
+    assert build_extra_reminder_specs(email, meet, settings, NOW.replace(day=12, hour=13, minute=30)) == []

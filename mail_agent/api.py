@@ -527,6 +527,25 @@ def create_app(settings: Settings | None = None, store: Store | None = None, llm
         threading.Thread(target=job, daemon=True).start()
         return {"started": True}
 
+    @app.post("/api/calendar/test-alarm")
+    def test_alarm(user: dict = Depends(require_user)):
+        """Puts a short event 2 minutes from now with an alarm at its start, to check the phone/PC notification."""
+        from .calendars import OutlookCalendar, build_test_alarm_spec
+
+        st = fresh_settings()
+        st.apply_preferences()
+        rt = graph_runtime(st, store)
+        if rt.calendar_client is None:
+            raise HTTPException(400, "일정을 넣을 Microsoft 계정이 없습니다. '+ 계정 추가'에서 Outlook 계정을 연결하세요.")
+        spec = build_test_alarm_spec(st, datetime.now(st.timezone))
+        try:
+            event_id = OutlookCalendar(rt.calendar_client, st).create(spec)
+        except Exception as e:
+            log_event("test_alarm_failed", error=str(e)[:300])
+            raise HTTPException(502, f"테스트 알림을 넣지 못했습니다: {str(e)[:200]}") from e
+        log_event("test_alarm", account=rt.calendar_client.username, at=spec.start.isoformat(timespec="minutes"))
+        return {"ok": True, "account": rt.calendar_client.username, "at": spec.start.strftime("%H:%M"), "event_id": event_id}
+
     @app.get("/api/health/full")
     def health_full(user: dict = Depends(require_user)):
         """Plain connection checklist: service running? Claude? Outlook mail? Outlook calendar (+ registered events)?"""

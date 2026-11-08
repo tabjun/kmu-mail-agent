@@ -111,6 +111,8 @@ class Settings:
     # Filled from data/preferences.json by apply_preferences()
     deadline_reminder_minutes: int = 24 * 60
     meeting_reminder_minutes: int = 30
+    deadline_reminders: list[int] = field(default_factory=lambda: [24 * 60])
+    meeting_reminders: list[int] = field(default_factory=lambda: [30])
     precheck_days: list[int] = field(default_factory=lambda: [3, 1])
     precheck_time: str = "09:00"
     cleanup_mode: str = "ask"
@@ -129,8 +131,11 @@ class Settings:
         self.calendar_account = p.calendar_account or self.calendar_account
         self.checklist_time = p.calendar.checklist_time
         self.auto_calendar_confidence = p.calendar.auto_add_confidence
-        self.deadline_reminder_minutes = p.calendar.deadline_reminder_minutes
-        self.meeting_reminder_minutes = p.calendar.meeting_reminder_minutes
+        self.deadline_reminders = p.calendar.deadline_list()
+        self.meeting_reminders = p.calendar.meeting_list()
+        # the event itself carries the closest alarm; earlier ones become '[미리 알림]' events
+        self.deadline_reminder_minutes = min(self.deadline_reminders)
+        self.meeting_reminder_minutes = min(self.meeting_reminders)
         self.precheck_days = sorted(set(p.calendar.precheck_days), reverse=True)
         self.precheck_time = p.calendar.precheck_time
         self.cleanup_mode = p.cleanup.mode

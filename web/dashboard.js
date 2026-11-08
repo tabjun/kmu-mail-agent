@@ -5,6 +5,7 @@ const listHtml = (arr) => (arr && arr.length ? `<ul>${arr.map((x) => `<li>${esc(
 const PRIO_ORDER = ["urgent", "today", "this_week", "this_month", "later"];
 const PRIO_SHORT = { urgent: "긴급", today: "오늘", this_week: "이번 주", this_month: "이번 달", later: "이후" };
 const WD = "일월화수목금토";
+const offsetText = (m) => (m % 1440 === 0 ? `${m / 1440}일 전` : m % 60 === 0 ? `${m / 60}시간 전` : `${m}분 전`);
 
 function whenText(iso) {
   if (!iso) return "기한 없음";
@@ -138,6 +139,7 @@ async function refreshPrefs() {
     const mode = { off: "정리 안 함", ask: "지우기 전에 물어보기", auto: "자동 정리" }[p.cleanup.mode];
     $("prefs-body").innerHTML = `<dl class="kv inline">
       <dt>오늘 할 일 알림</dt><dd>${p.calendar.checklist_time ? `매일 ${esc(p.calendar.checklist_time)}` : "끔"}</dd>
+      <dt>회의 · 마감 알림</dt><dd>${(p.calendar.meeting_reminders.length ? p.calendar.meeting_reminders : [p.calendar.meeting_reminder_minutes]).map(offsetText).join(", ")} · ${(p.calendar.deadline_reminders.length ? p.calendar.deadline_reminders : [p.calendar.deadline_reminder_minutes]).map(offsetText).join(", ")}</dd>
       <dt>점검 알림</dt><dd>${p.calendar.precheck_days.length ? p.calendar.precheck_days.map((d) => `D-${d}`).join(", ") + ` ${esc(p.calendar.precheck_time)}` : "끔"}</dd>
       <dt>불필요한 메일</dt><dd>${esc(mode)} · 기준 ${p.cleanup.rules.length}개 · 예외 ${p.cleanup.keep_rules.length}개</dd>
       <dt>우선순위 규칙</dt><dd>${p.priority_rules.length}개 · 중요 발신자 ${p.vip_senders.length}명</dd>
@@ -177,3 +179,14 @@ window.addEventListener("focus", refreshAll);
 refreshAll();
 setInterval(refreshStatus, 15000);
 setInterval(() => { refreshActions(); refreshTodo(); }, 60000);
+
+$("test-alarm").addEventListener("click", async () => {
+  const msg = $("test-alarm-msg");
+  $("test-alarm").disabled = true;
+  msg.textContent = "Outlook 캘린더에 넣는 중…";
+  try {
+    const r = await api("/api/calendar/test-alarm", { method: "POST" });
+    msg.innerHTML = `✅ ${esc(r.at)}에 울립니다 (${esc(r.account)})`;
+  } catch (e) { msg.textContent = e.message.replace(/^\d+ /, ""); }
+  finally { $("test-alarm").disabled = false; }
+});

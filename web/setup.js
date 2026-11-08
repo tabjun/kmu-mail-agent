@@ -85,12 +85,55 @@ async function connectWithCode(email) {
   }
 }
 
+// ---------- step 2: alarm time chips (multiple reminders + custom) ----------
+const PRESETS = { meeting: [5, 10, 15, 30, 60, 120, 1440], deadline: [60, 180, 1440, 2880, 4320] };
+const alarmSel = { meeting: new Set([30]), deadline: new Set([1440]) };
+const offsetLabel = (m) => (m % 1440 === 0 ? `${m / 1440}일 전` : m % 60 === 0 ? `${m / 60}시간 전` : `${m}분 전`);
+
+function renderChips(kind) {
+  const box = $(`${kind}-chips`);
+  const all = [...new Set([...PRESETS[kind], ...alarmSel[kind]])].sort((a, b) => a - b);
+  box.innerHTML = all.map((m) => `<button type="button" class="tchip${alarmSel[kind].has(m) ? " on" : ""}" data-kind="${kind}" data-m="${m}">
+    ${alarmSel[kind].has(m) ? "✓ " : ""}${offsetLabel(m)}</button>`).join("");
+  box.querySelectorAll(".tchip").forEach((b) => b.addEventListener("click", () => {
+    const m = Number(b.dataset.m);
+    if (alarmSel[kind].has(m)) {
+      if (alarmSel[kind].size === 1) { alert("알림은 하나 이상 골라 주세요."); return; }
+      alarmSel[kind].delete(m);
+    } else alarmSel[kind].add(m);
+    renderChips(kind);
+  }));
+}
+document.querySelectorAll("[data-add]").forEach((b) => b.addEventListener("click", () => {
+  const kind = b.dataset.add;
+  const n = Number($(`${kind}-n`).value);
+  const unit = Number($(`${kind}-u`).value);
+  if (!n || n < 1) { $(`${kind}-n`).focus(); return; }
+  const minutes = n * unit;
+  if (minutes > 14 * 1440) { alert("2주 이내로 입력해 주세요."); return; }
+  alarmSel[kind].add(minutes);
+  $(`${kind}-n`).value = "";
+  renderChips(kind);
+}));
+
+$("test-alarm").addEventListener("click", async () => {
+  const msg = $("test-alarm-msg");
+  $("test-alarm").disabled = true;
+  msg.textContent = "Outlook 캘린더에 넣는 중…";
+  try {
+    const r = await api("/api/calendar/test-alarm", { method: "POST" });
+    msg.innerHTML = `✅ <b>${esc(r.at)}</b>에 울리는 '🔔 테스트 알림'을 ${esc(r.account)} 캘린더에 넣었습니다. PC·휴대폰에서 울리는지 확인하세요.`;
+  } catch (e) { msg.textContent = e.message.replace(/^\d+ /, ""); }
+  finally { $("test-alarm").disabled = false; }
+});
+
 // ---------- step 2: basic settings ----------
 async function fillForm() {
   const p = await api("/api/preferences");
   $("f-checklist").value = p.calendar.checklist_time || "08:00";
-  $("f-deadline").value = String(p.calendar.deadline_reminder_minutes);
-  $("f-meeting").value = String(p.calendar.meeting_reminder_minutes);
+  alarmSel.meeting = new Set(p.calendar.meeting_reminders.length ? p.calendar.meeting_reminders : [p.calendar.meeting_reminder_minutes]);
+  alarmSel.deadline = new Set(p.calendar.deadline_reminders.length ? p.calendar.deadline_reminders : [p.calendar.deadline_reminder_minutes]);
+  renderChips("meeting"); renderChips("deadline");
   document.querySelectorAll(".f-pre").forEach((c) => (c.checked = p.calendar.precheck_days.includes(Number(c.value))));
   $("f-pretime").value = p.calendar.precheck_time;
   document.querySelectorAll("input[name=cleanup]").forEach((r) => (r.checked = r.value === p.cleanup.mode));
@@ -112,8 +155,10 @@ function formPatch() {
     cleanup: { mode: document.querySelector("input[name=cleanup]:checked").value },
     calendar: {
       checklist_time: $("f-checklist").value || null,
-      deadline_reminder_minutes: Number($("f-deadline").value),
-      meeting_reminder_minutes: Number($("f-meeting").value),
+      meeting_reminders: [...alarmSel.meeting].sort((a, b) => b - a),
+      deadline_reminders: [...alarmSel.deadline].sort((a, b) => b - a),
+      meeting_reminder_minutes: Math.min(...alarmSel.meeting),
+      deadline_reminder_minutes: Math.min(...alarmSel.deadline),
       precheck_days: [...document.querySelectorAll(".f-pre:checked")].map((c) => Number(c.value)),
       precheck_time: $("f-pretime").value || "09:00",
     },
