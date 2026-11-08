@@ -12,6 +12,8 @@
 - **`.env` 파일**: Claude API 키가 든 파일입니다. 담당 학생이 카카오톡·메일로 따로 보내 드립니다. 받은 파일은 **다운로드**(또는 '카카오톡 받은 파일') 폴더에 저장된 그대로 두세요.
   저장할 때 이름이 `env`나 `.env.txt`로 바뀌어도 괜찮습니다.
 - 학교 Office 365 계정(@ms.kmu.ac.kr)
+- **git은 없어도 됩니다.** 프로그램은 GitHub에서 ZIP으로 받습니다(Windows에 기본으로 있는 PowerShell 사용).
+  - Code 탭을 처음 열 때 Claude Desktop이 'Git for Windows' 설치를 요구하는 경우에만 안내대로 설치하세요. 메일 비서 자체는 git이 필요 없습니다.
 
 ## 1. 프로그램을 둘 `schedule` 폴더 만들기 (1분)
 1. 키보드에서 <kbd>Win</kbd> + <kbd>R</kbd>을 누르고 `%USERPROFILE%`를 입력한 뒤 <kbd>Enter</kbd>를 누릅니다. 내 사용자 폴더(`C:\Users\(이름)`)가 열립니다.
@@ -29,9 +31,9 @@
 GitHub 저장소 https://github.com/tabjun/kmu-mail-agent 의 '메일 비서'를 이 PC에 설치해 줘.
 지금 작업 폴더(schedule)가 설치 위치야.
 
-1. 저장소를 이 폴더 안에 바로 받아 줘(하위 폴더를 따로 만들지 말고, 설치하기.bat이 이 폴더 바로 안에 오게).
-   폴더가 비어 있지 않으면 임시 폴더에 받은 뒤 내용을 이 폴더로 옮겨 줘.
-   git이 없으면 https://github.com/tabjun/kmu-mail-agent/archive/refs/heads/main.zip 을 내려받아 같은 방식으로 풀어 줘.
+1. 이 PC에는 git이 없으니 git을 쓰거나 설치하지 말고, PowerShell로
+   https://github.com/tabjun/kmu-mail-agent/archive/refs/heads/main.zip 을 내려받아 압축을 풀어 줘.
+   ZIP 안의 kmu-mail-agent-main 폴더 '안의 내용'을 이 폴더로 옮겨서, 설치하기.bat이 이 폴더 바로 안에 오게 해 줘(하위 폴더 없이).
 2. API 키는 내가 따로 받은 .env 파일에 있어. 다운로드 폴더(또는 문서\카카오톡 받은 파일)에 있고, 이름이 env나 .env.txt로
    바뀌었을 수 있어. 그 파일을 이 폴더로 복사해서 이름을 .env로 해 줘(설치하기.bat 옆에 오게).
    .env 안의 값은 화면에 보여주지 말고, ROOT_API_KEY와 ANTHROPIC_WORKSPACE_ID 값이 들어 있는지만 확인해 줘.
@@ -61,6 +63,11 @@ GitHub 저장소 https://github.com/tabjun/kmu-mail-agent 의 '메일 비서'를
 - 불필요한 메일은 대시보드의 **불필요한 메일 정리** 카드에서 승인하거나 거절합니다. 승인하면 지운 편지함으로 옮겨지고, 복구할 수 있습니다.
   승인할 때마다 메일 비서가 정리 기준을 스스로 배워서, **🧠 배운 규칙** 버튼에서 확인하고 지울 수 있습니다.
 - 기준을 직접 바꾸고 싶으면 🧹 / 📌 / 📅 버튼(전용 도우미)을 누르고 말로 설명하면 됩니다.
+
+## 나중에 업데이트하려면 (git 없이)
+- `schedule` 폴더의 **`업데이트하기.bat`**을 더블클릭하면 됩니다. GitHub에서 최신 버전을 받아 프로그램 파일만 바꾸고 메일 비서를 다시 켭니다.
+  `.env`(키), `data\`(메일 기록·로그인·설정)는 그대로 둡니다.
+- Claude에게 맡기려면 Code 탭에서 `schedule` 폴더를 열고 "업데이트하기.bat 실행해서 메일 비서 최신으로 업데이트해 줘"라고 하면 됩니다.
 
 ## Claude 없이 설치하려면
 README의 **설치 방법 1 · 클릭만으로**를 따라 하세요. ZIP을 받아 `설치하기.bat`을 더블클릭하면 됩니다.

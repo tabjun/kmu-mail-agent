@@ -304,6 +304,19 @@
   - Claude(Code 탭)가 찾아서 `schedule` 폴더로 옮깁니다.
   - 못 찾으면 대시보드 맨 위 안내(Win+R → 폴더 주소 → Enter → .env 넣기)를 따르면 됩니다.
 
+## 18. git 없는 PC에서 설치와 업데이트
+
+**상황:** 교수님 PC에는 git이 없을 것이라고 했습니다.
+
+**판단과 구현:**
+- 설치 프롬프트를 바꿨습니다. git을 쓰거나 설치하지 말고, Windows에 기본으로 있는 PowerShell로 GitHub ZIP을 받아 `schedule` 폴더 바로 안에 풀게 합니다.
+- 업데이트도 git 없이 되도록 `업데이트하기.bat`(`scripts/update_windows.ps1`)을 추가했습니다.
+  - 최신 ZIP을 받은 뒤 서비스를 잠시 멈춥니다.
+  - robocopy로 프로그램 파일만 덮어씁니다. `.env`, `data/`, `outputs/`, `.venv/`는 건드리지 않습니다.
+  - 패키지를 맞추고 서비스를 다시 켭니다.
+- PowerShell 5.1과 실제 GitHub ZIP으로 시험했습니다. 키와 설정은 남고 코드는 최신으로 바뀌는 것을 확인했습니다.
+- Claude Desktop의 Code 탭이 Windows에서 Git for Windows를 요구하는지는 확인하지 못했습니다. 그래서 안내에는 "요구할 때만 설치"라고 적었습니다.
+
 ---
 
 ## 역할 분담

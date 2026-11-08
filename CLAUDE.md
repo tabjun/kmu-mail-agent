@@ -33,6 +33,11 @@ Office 365(Outlook) 메일을 주기적으로 읽어 Claude로 분류하고, 할
    3. 저장하고 실행
 7. 대시보드의 **연결 상태**가 모두 ✅인지 확인합니다(서비스 / Claude / Outlook 메일 / Outlook 캘린더).
 
+## 업데이트 (git 없음)
+교수님 PC에는 보통 git이 없습니다. 설치는 GitHub ZIP(`archive/refs/heads/main.zip`)으로 하고, 업데이트는
+`업데이트하기.bat`(= `scripts\update_windows.ps1`)으로 합니다. 최신 ZIP을 받아 robocopy로 프로그램 파일만 덮어쓰고
+(`.env`, `data/`, `outputs/`, `.venv/` 제외), 패키지를 맞춘 뒤 서비스를 다시 켭니다. git을 설치하라고 하지 마세요.
+
 ## 문제 해결
 - 연결 상태 ❌ "다시 로그인이 필요합니다" → 대시보드 '+ 계정 추가'에서 같은 계정을 다시 연결합니다(권한이 추가된 경우).
 - "관리자 승인 필요" 화면 → 학교 테넌트 정책입니다. `docs/admin-consent-request.md`를 참고해 정보통신처에 요청합니다.
